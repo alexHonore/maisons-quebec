@@ -2,11 +2,33 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authorizeAdminRequest, ADMIN_COOKIE_NAME, renderAdminRefusalDocument } from "@/server/admin-access";
 import { adminPathRequiresSession } from "@/server/admin-gate";
+import { recordPageView, shouldRecordRequest } from "@/server/page-views";
+import { settingsDatabase } from "@/server/public-site";
+
+function continueWithPath(request: NextRequest, pathname: string) {
+  const headers = new Headers(request.headers);
+  headers.set("x-mq-path", pathname);
+  if (shouldRecordRequest({
+    method: request.method,
+    path: pathname,
+    accept: request.headers.get("accept") ?? "",
+    prefetch: request.headers.get("next-router-prefetch"),
+    rsc: request.headers.get("rsc"),
+    phase: process.env.NEXT_PHASE,
+  })) {
+    try {
+      recordPageView(settingsDatabase(process.env), pathname, new Date());
+    } catch {
+      // La page reste servie si l'écriture de la vue échoue.
+    }
+  }
+  return NextResponse.next({ request: { headers } });
+}
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname.replace(/\/$/, "") || "/";
   if (!adminPathRequiresSession(pathname)) {
-    return NextResponse.next();
+    return continueWithPath(request, pathname);
   }
 
   const decision = await authorizeAdminRequest({
@@ -16,7 +38,7 @@ export async function proxy(request: NextRequest) {
   });
 
   if (decision.allowed) {
-    return NextResponse.next();
+    return continueWithPath(request, pathname);
   }
 
   return new NextResponse(renderAdminRefusalDocument(), {
@@ -34,5 +56,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin", "/admin/:path*"],
+  matcher: ["/((?!_next/static|_next/image|icon.svg).*)"],
 };

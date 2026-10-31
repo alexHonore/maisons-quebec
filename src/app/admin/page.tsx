@@ -67,6 +67,11 @@ export default async function AdminPage() {
             <Link href="/admin/leads">Demandes</Link>
           </li>
         ) : null}
+        {roleCan(user.role, "analytics.read") ? (
+          <li>
+            <Link href="/admin/analytics">Analytique</Link>
+          </li>
+        ) : null}
         {roleCan(user.role, "events.read") ? (
           <li>
             <Link href="/admin/events">Événements</Link>

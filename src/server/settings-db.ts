@@ -276,6 +276,17 @@ export const MIGRATIONS = [
       DROP TABLE IF EXISTS prompt_layers;
     `,
   },
+  {
+    version: "013_page_views",
+    up: `
+      CREATE TABLE page_views (
+        id TEXT PRIMARY KEY,
+        path TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS page_views;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {
