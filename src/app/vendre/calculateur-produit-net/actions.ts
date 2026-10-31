@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { netProceedsInputFromFields } from "@/domain/net-proceeds-form";
 import { readNetProceedsLink } from "@/domain/net-proceeds-link";
-import { captureLead, dispatchPendingOutbox, saveNetProceedsDraft } from "@/server/acquisition";
+import { captureLead, dispatchPendingOutbox, postWebhookRequest, saveNetProceedsDraft } from "@/server/acquisition";
 import { settingsDatabase } from "@/server/public-site";
 
 export async function calculateNetProceedsAction(formData: FormData) {
@@ -65,10 +65,7 @@ export async function requestFollowUpAction(formData: FormData) {
     await dispatchPendingOutbox(db, {
       now: new Date(),
       sessionSecret: process.env.ADMIN_SESSION_SECRET ?? "",
-      transport: async ({ url, body, headers }) => {
-        const response = await fetch(url, { method: "POST", headers, body, redirect: "manual" });
-        return { status: response.status };
-      },
+      transport: postWebhookRequest,
     });
   } catch {
     // La demande est déjà enregistrée. L'échec de livraison ne la retire pas.

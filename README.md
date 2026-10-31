@@ -21,9 +21,10 @@ npm run lint
 npm run typecheck
 npm run build
 npm run test:e2e
+npm run ci
 ```
 
-`npm run test:e2e` lance les trois parcours Playwright contre l'application déjà construite. Il ne couvre pas le reste du jalon 8.
+`npm run ci` enchaîne lint, types, tests, build et les trois parcours Playwright. Chromium doit déjà être installé. Ce n'est pas le jalon 8 complet.
 
 `npm test` exécute le calcul du produit net, les pages piliers, l'identité réglementaire, les migrations SQLite, le TOTP et la connexion admin.
 

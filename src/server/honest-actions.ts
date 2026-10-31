@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { FUNNEL_PATHS, isHonestFunnelName, parseFunnelFields } from "@/domain/honest-funnels";
-import { captureLead, dispatchPendingOutbox, saveFunnelDraft } from "@/server/acquisition";
+import { captureLead, dispatchPendingOutbox, postWebhookRequest, saveFunnelDraft } from "@/server/acquisition";
 import { settingsDatabase } from "@/server/public-site";
 
 function formFields(formData: FormData): { [key: string]: string } {
@@ -55,10 +55,7 @@ export async function requestHonestFollowUpAction(formData: FormData) {
     await dispatchPendingOutbox(settingsDatabase(process.env), {
       now: new Date(),
       sessionSecret: process.env.ADMIN_SESSION_SECRET ?? "",
-      transport: async ({ url, body, headers }) => {
-        const response = await fetch(url, { method: "POST", headers, body, redirect: "manual" });
-        return { status: response.status };
-      },
+      transport: postWebhookRequest,
     });
   } catch {
     // La demande est déjà enregistrée. L'échec de livraison ne la retire pas.

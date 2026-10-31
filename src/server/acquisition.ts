@@ -601,10 +601,26 @@ export type WebhookTransport = (input: {
   headers: Record<string, string>;
 }) => Promise<{ status: number }>;
 
+/** POST réel. Une réponse n'est livrée que si le statut HTTP est 2xx. */
+export async function postWebhookRequest(input: {
+  url: string;
+  body: string;
+  headers: Record<string, string>;
+}): Promise<{ status: number }> {
+  const response = await fetch(input.url, {
+    method: "POST",
+    headers: input.headers,
+    body: input.body,
+    redirect: "manual",
+  });
+  return { status: response.status };
+}
+
 export async function dispatchPendingOutbox(
   db: DatabaseSync,
-  input: { now: Date; transport: WebhookTransport; sessionSecret: string },
+  input: { now: Date; transport?: WebhookTransport; sessionSecret: string },
 ): Promise<{ delivered: number; failed: number; waiting: number }> {
+  const transport = input.transport ?? postWebhookRequest;
   const destinations = db
     .prepare("SELECT id, url, secret_ciphertext FROM webhook_destinations WHERE enabled = 1")
     .all();
@@ -628,7 +644,7 @@ export async function dispatchPendingOutbox(
         errorCode = "secret_illisible";
       } else {
         try {
-          const response = await input.transport({
+          const response = await transport({
             url: String(destination.url),
             body,
             headers: {
