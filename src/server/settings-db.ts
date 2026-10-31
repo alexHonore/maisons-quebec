@@ -352,6 +352,21 @@ export const MIGRATIONS = [
       DROP TABLE IF EXISTS media_assets;
     `,
   },
+  {
+    version: "016_visitor_sessions",
+    up: `
+      ALTER TABLE page_views ADD COLUMN visitor_id TEXT;
+      CREATE TABLE visitor_sessions (
+        id TEXT PRIMARY KEY,
+        visitor_id TEXT NOT NULL,
+        started_at TEXT NOT NULL
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS visitor_sessions;
+      ALTER TABLE page_views DROP COLUMN visitor_id;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

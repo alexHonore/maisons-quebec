@@ -33,7 +33,10 @@ export default async function AnalyticsPage({
   return (
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Analytique</h1>
-      <p>Seules les vues de pages publiques et les demandes déjà enregistrées sont comptées. Rien d&apos;autre n&apos;est mesuré.</p>
+      <p>
+        Une session démarre à une vue de page publique. Un visiteur unique est un identifiant distinct sur la période. Le cookie ne contient ni nom ni courriel.
+        Le temps engagé et la rétention restent des trous : la page n&apos;envoie aucune durée.
+      </p>
       <ul className="plain-list">
         {NOT_COLLECTED.map((item) => (
           <li key={item}>{item} — trou</li>
@@ -55,6 +58,8 @@ export default async function AnalyticsPage({
         <>
           <p>Période {report.from} au {report.to}, fuseau {report.timezone}.</p>
           <p>Vues de pages : {measureText(report.pageViews)}</p>
+          <p>Sessions : {measureText(report.sessions)}</p>
+          <p>Visiteurs uniques : {measureText(report.uniqueVisitors)}</p>
           <p>Demandes : {measureText(report.leads)}</p>
           <h2>Pages</h2>
           {report.pages.state === "trou" ? (

@@ -1,8 +1,8 @@
+import { readTrackingId } from "./visit-tracking";
+
 export const ANALYTICS_TIME_ZONE = "America/Toronto";
 
 export const NOT_COLLECTED = [
-  "sessions",
-  "visiteurs uniques",
   "rétention",
   "temps engagé",
   "Search Console",
@@ -21,6 +21,8 @@ export type AnalyticsReport = {
   readonly from: string;
   readonly to: string;
   readonly pageViews: ObservedCount | Gap;
+  readonly sessions: ObservedCount | Gap;
+  readonly uniqueVisitors: ObservedCount | Gap;
   readonly leads: ObservedCount | Gap;
   readonly pages: { readonly state: "observe"; readonly rows: readonly PageViewRow[] } | Gap;
   readonly conversions: { readonly state: "observe"; readonly rows: readonly FunnelLeadRow[] } | Gap;
@@ -82,15 +84,24 @@ function inPeriod(iso: string, startIso: string, endIso: string): boolean {
   return iso >= startIso && iso < endIso;
 }
 
+function observedOrGap(count: number): ObservedCount | Gap {
+  return count === 0 ? { state: "trou" } : { state: "observe", count };
+}
+
 export function buildAnalyticsReport(input: {
   readonly from: string;
   readonly to: string;
-  readonly pageViews: readonly { readonly path: string; readonly occurredAt: string }[];
+  readonly pageViews: readonly { readonly path: string; readonly occurredAt: string; readonly visitorId?: string | null }[];
+  readonly sessions: readonly { readonly startedAt: string }[];
   readonly leads: readonly { readonly funnelName: string; readonly createdAt: string }[];
 }): AnalyticsReport | null {
   const bounds = periodBounds(input.from, input.to);
   if (!bounds) return null;
   const views = input.pageViews.filter((row) => inPeriod(row.occurredAt, bounds.startIso, bounds.endIso));
+  const sessions = input.sessions.filter((row) => inPeriod(row.startedAt, bounds.startIso, bounds.endIso));
+  const visitors = new Set(
+    views.map((row) => readTrackingId(row.visitorId)).filter((id): id is string => id !== null),
+  );
   const leads = input.leads.filter((row) => inPeriod(row.createdAt, bounds.startIso, bounds.endIso));
   const pageCounts = new Map<string, number>();
   for (const view of views) pageCounts.set(view.path, (pageCounts.get(view.path) ?? 0) + 1);
@@ -107,8 +118,10 @@ export function buildAnalyticsReport(input: {
     timezone: ANALYTICS_TIME_ZONE,
     from: input.from,
     to: input.to,
-    pageViews: views.length === 0 ? { state: "trou" } : { state: "observe", count: views.length },
-    leads: leads.length === 0 ? { state: "trou" } : { state: "observe", count: leads.length },
+    pageViews: observedOrGap(views.length),
+    sessions: observedOrGap(sessions.length),
+    uniqueVisitors: observedOrGap(visitors.size),
+    leads: observedOrGap(leads.length),
     pages: pageRows.length === 0 ? { state: "trou" } : { state: "observe", rows: pageRows },
     conversions: funnelRows.length === 0 ? { state: "trou" } : { state: "observe", rows: funnelRows },
     notCollected: NOT_COLLECTED,
@@ -120,6 +133,8 @@ export type TotalLine = { readonly kind: "total" | "page" | "funnel"; readonly n
 export function reportTotalLines(report: AnalyticsReport): TotalLine[] {
   const lines: TotalLine[] = [
     { kind: "total", name: "page_views", state: report.pageViews.state, count: report.pageViews.state === "observe" ? report.pageViews.count : null },
+    { kind: "total", name: "sessions", state: report.sessions.state, count: report.sessions.state === "observe" ? report.sessions.count : null },
+    { kind: "total", name: "unique_visitors", state: report.uniqueVisitors.state, count: report.uniqueVisitors.state === "observe" ? report.uniqueVisitors.count : null },
     { kind: "total", name: "leads", state: report.leads.state, count: report.leads.state === "observe" ? report.leads.count : null },
   ];
   if (report.pages.state === "observe") {
@@ -149,6 +164,8 @@ export function renderAnalyticsJson(report: AnalyticsReport): string {
     to: report.to,
     totals: {
       page_views: report.pageViews,
+      sessions: report.sessions,
+      unique_visitors: report.uniqueVisitors,
       leads: report.leads,
     },
     pages: report.pages,
@@ -176,7 +193,7 @@ export function renderAnalyticsPdf(report: AnalyticsReport): string {
     `periode ${report.from} ${report.to}`,
     "fuseau America/Toronto",
     ...totalsSignature(report).split("\n"),
-    "non collecte sessions visiteurs retention temps SearchConsole taux page",
+    "non collecte retention temps engage Search Console taux par page",
   ];
   const commands = ["BT", "/F1 11 Tf", "72 740 Td"];
   lines.forEach((line, index) => {

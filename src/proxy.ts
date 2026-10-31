@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authorizeAdminRequest, ADMIN_COOKIE_NAME, renderAdminRefusalDocument } from "@/server/admin-access";
 import { adminPathRequiresSession } from "@/server/admin-gate";
-import { recordPageView, shouldRecordRequest } from "@/server/page-views";
+import { recordPublicVisit, SESSION_COOKIE, shouldRecordRequest, VISITOR_COOKIE, VISITOR_MAX_AGE_SECONDS } from "@/server/page-views";
 import { settingsDatabase } from "@/server/public-site";
 
 function continueWithPath(request: NextRequest, pathname: string) {
   const headers = new Headers(request.headers);
   headers.set("x-mq-path", pathname);
+  const response = NextResponse.next({ request: { headers } });
   if (shouldRecordRequest({
     method: request.method,
     path: pathname,
@@ -17,12 +18,34 @@ function continueWithPath(request: NextRequest, pathname: string) {
     phase: process.env.NEXT_PHASE,
   })) {
     try {
-      recordPageView(settingsDatabase(process.env), pathname, new Date());
+      const recorded = recordPublicVisit(settingsDatabase(process.env), {
+        path: pathname,
+        visitorCookie: request.cookies.get(VISITOR_COOKIE)?.value,
+        sessionCookie: request.cookies.get(SESSION_COOKIE)?.value,
+      });
+      if (recorded.ok) {
+        const secure = request.nextUrl.protocol === "https:";
+        response.cookies.set(VISITOR_COOKIE, recorded.visitorId, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure,
+          path: "/",
+          maxAge: VISITOR_MAX_AGE_SECONDS,
+        });
+        if (recorded.startSession) {
+          response.cookies.set(SESSION_COOKIE, recorded.sessionId, {
+            httpOnly: true,
+            sameSite: "lax",
+            secure,
+            path: "/",
+          });
+        }
+      }
     } catch {
       // La page reste servie si l'écriture de la vue échoue.
     }
   }
-  return NextResponse.next({ request: { headers } });
+  return response;
 }
 
 export async function proxy(request: NextRequest) {

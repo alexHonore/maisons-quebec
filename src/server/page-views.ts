@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { planPublicVisit } from "../domain/visit-tracking";
+
+export const VISITOR_COOKIE = "mq_visitor";
+export const SESSION_COOKIE = "mq_session";
+export const VISITOR_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
 
 const PUBLIC_PATH = /^\/[a-z0-9/_-]*$/;
 
@@ -14,11 +19,50 @@ export function normalizePublicPath(raw: string): string | null {
   return trimmed;
 }
 
-export function recordPageView(db: DatabaseSync, rawPath: string, now = new Date()): boolean {
+export function recordPageView(db: DatabaseSync, rawPath: string, now = new Date(), visitorId?: string | null): boolean {
   const path = normalizePublicPath(rawPath);
   if (!path) return false;
-  db.prepare("INSERT INTO page_views (id, path, occurred_at) VALUES (?, ?, ?)").run(randomUUID(), path, now.toISOString());
+  db.prepare("INSERT INTO page_views (id, path, occurred_at, visitor_id) VALUES (?, ?, ?, ?)").run(
+    randomUUID(),
+    path,
+    now.toISOString(),
+    visitorId ?? null,
+  );
   return true;
+}
+
+export function recordPublicVisit(
+  db: DatabaseSync,
+  input: { path: string; now?: Date; visitorCookie?: string | null; sessionCookie?: string | null },
+): { ok: true; visitorId: string; sessionId: string; startSession: boolean } | { ok: false } {
+  if (!normalizePublicPath(input.path)) return { ok: false };
+  const plan = planPublicVisit({
+    visitorCookie: input.visitorCookie,
+    sessionCookie: input.sessionCookie,
+    nextVisitorId: randomUUID(),
+    nextSessionId: randomUUID(),
+  });
+  const now = input.now ?? new Date();
+  const occurredAt = now.toISOString();
+  db.exec("BEGIN");
+  try {
+    if (!recordPageView(db, input.path, now, plan.visitorId)) {
+      db.exec("ROLLBACK");
+      return { ok: false };
+    }
+    if (plan.startSession) {
+      db.prepare("INSERT INTO visitor_sessions (id, visitor_id, started_at) VALUES (?, ?, ?)").run(
+        plan.sessionId,
+        plan.visitorId,
+        occurredAt,
+      );
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return { ok: true, visitorId: plan.visitorId, sessionId: plan.sessionId, startSession: plan.startSession };
 }
 
 export function shouldRecordRequest(input: {
