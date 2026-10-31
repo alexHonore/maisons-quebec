@@ -170,7 +170,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
     },
     guides: {
       title: "Guides",
-      body: "Aucun guide n'est publié. Une page ne sera mise en ligne que si son contenu est spécifique et vérifiable. Les adresses prévues pour plus tard ne sont pas créées vides.",
+      body: "Les pages de guide ajoutées dans l'administration ne s'affichent qu'une fois publiées. Un brouillon n'est pas public. Un exemple n'est pas un fait de marché.",
     },
     method: {
       title: "Méthode et limites",

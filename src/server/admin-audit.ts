@@ -18,6 +18,9 @@ export const AUDIT_ACTIONS = [
   "event.definition_saved",
   "event.definition_disabled",
   "event.definition_enabled",
+  "content.saved",
+  "content.published",
+  "content.unpublished",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

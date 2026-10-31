@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PillarView } from "@/components/pillar-view";
 import { pillarBySlug } from "@/content/pillars";
+import { listPublishedGuides } from "@/server/content-pages";
+import { settingsDatabase } from "@/server/public-site";
 
 const page = pillarBySlug("guides");
 
@@ -13,5 +16,24 @@ export const metadata: Metadata = {
 };
 
 export default function GuidesPage() {
-  return <PillarView slug="guides" />;
+  const published = listPublishedGuides(settingsDatabase(process.env));
+  return (
+    <PillarView slug="guides">
+      <section>
+        <h2>Pages publiées</h2>
+        {published.length === 0 ? (
+          <p>Aucune page publiée. Un brouillon n&apos;apparaît pas ici.</p>
+        ) : (
+          <ul className="plain-list">
+            {published.map((guide) => (
+              <li key={guide.slug}>
+                <Link href={`/guides/${guide.slug}`}>{guide.title}</Link>
+                {guide.indexable ? " — indexable" : " — non indexée"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </PillarView>
+  );
 }

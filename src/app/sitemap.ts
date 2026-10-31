@@ -2,8 +2,12 @@ import type { MetadataRoute } from "next";
 import { PILLAR_PAGES } from "@/content/pillars";
 import { FUNNEL_PATHS, HONEST_FUNNELS } from "@/domain/honest-funnels";
 import { readSiteUrl } from "@/domain/site-url";
+import { listIndexableGuidePaths } from "@/server/content-pages";
+import { settingsDatabase } from "@/server/public-site";
 
 const CONTENT_DATE = "2026-10-31";
+
+export const dynamic = "force-dynamic";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const site = readSiteUrl(process.env);
@@ -31,6 +35,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: CONTENT_DATE,
       changeFrequency: "monthly" as const,
       priority: 0.7,
+    })),
+    ...listIndexableGuidePaths(settingsDatabase(process.env)).map((page) => ({
+      url: new URL(`/guides/${page.slug}`, site.origin).href,
+      lastModified: page.updatedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
     })),
   ];
 }

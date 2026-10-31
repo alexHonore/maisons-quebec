@@ -208,6 +208,25 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS event_definitions;",
   },
+  {
+    version: "010_content_pages",
+    up: `
+      CREATE TABLE content_pages (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        body TEXT NOT NULL,
+        source_note TEXT NOT NULL,
+        example INTEGER NOT NULL CHECK (example IN (0, 1)),
+        status TEXT NOT NULL CHECK (status IN ('draft', 'published')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        published_at TEXT
+      );
+    `,
+    down: "DROP TABLE IF EXISTS content_pages;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

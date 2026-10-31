@@ -14,6 +14,9 @@ export const ADMIN_PERMISSIONS = {
   "appointments.confirm": ["owner"],
   "events.read": ["owner", "analyst", "integration_manager"],
   "events.manage": ["owner", "integration_manager"],
+  "content.write": ["owner", "editor"],
+  "content.preview": ["owner", "editor"],
+  "content.publish": ["owner"],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

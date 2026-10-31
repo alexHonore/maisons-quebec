@@ -152,14 +152,14 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
     slug: "guides",
     path: "/guides",
     title: "Guides",
-    description: "Aucun guide n'est publié. La règle de publication est expliquée.",
-    lead: "Aucun guide n'est en ligne. Une page ne sera publiée que si son contenu est spécifique, sourcé et vérifiable.",
+    description: "Les pages de guide viennent de l'administration. Un brouillon reste privé.",
+    lead: "Une page de guide apparaît ici seulement après publication. Un brouillon n'est pas public. Une page trop courte, sans source, marquée comme exemple, ou porteuse d'un chiffre non vérifié n'est pas indexée.",
     sections: [
       {
         heading: "Règle avant publication",
         paragraphs: [
           "Un guide doit répondre à une question réelle, dire ce qu'il ne sait pas, et citer une source quand il avance un fait, un taux ou une règle.",
-          "Les textes produits par un modèle restent des brouillons. Aucun article n'est généré ni publié ici.",
+          "Aucun texte de modèle n'est généré ici. Un exemple est marqué comme exemple et n'est pas un fait de marché.",
         ],
       },
     ],

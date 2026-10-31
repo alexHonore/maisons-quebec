@@ -37,6 +37,11 @@ export default async function AdminPage() {
             <Link href="/admin/settings">Réglages du site</Link>
           </li>
         ) : null}
+        {roleCan(user.role, "content.preview") ? (
+          <li>
+            <Link href="/admin/contenu">Pages de contenu</Link>
+          </li>
+        ) : null}
         {roleCan(user.role, "users.manage") ? (
           <li>
             <Link href="/admin/team">Comptes</Link>

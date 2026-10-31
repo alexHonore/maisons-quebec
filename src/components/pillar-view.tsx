@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { pillarBySlug, type PillarPage } from "@/content/pillars";
 import { PublicFrame } from "@/components/public-frame";
 import { loadPublicSite } from "@/server/public-site";
 
-export function PillarView({ slug }: { slug: PillarPage["slug"] }) {
+export function PillarView({ slug, children }: { slug: PillarPage["slug"]; children?: ReactNode }) {
   const page = pillarBySlug(slug);
   if (!page) return null;
   const { content } = loadPublicSite(process.env);
@@ -28,6 +29,7 @@ export function PillarView({ slug }: { slug: PillarPage["slug"] }) {
             ))}
           </ul>
         </section>
+        {children}
         <ul className="nav">
           {page.links.map((link) => (
             <li key={link.href}>
