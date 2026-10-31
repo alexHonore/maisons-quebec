@@ -18,6 +18,7 @@ export async function createAdminAccountAction(formData: FormData) {
   const roleValue = String(formData.get("role") ?? "");
   if (!isRole(roleValue)) forbidden();
   const result = createAdminAccount(settingsDatabase(process.env), {
+    actorId: live.user.id,
     actorRole: live.user.role,
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),

@@ -12,6 +12,8 @@ import {
   type AdminRole,
 } from "./admin-access";
 import { decodeBase32, verifyTotp } from "./totp";
+import { confirmedTotpSecret, totpKeyFromSessionSecret } from "./totp-vault";
+import { recordAdminAudit } from "./admin-audit";
 
 export type LoginFailure = "auth_not_configured" | "invalid_credentials" | "invalid_totp";
 
@@ -144,16 +146,26 @@ export async function attemptLogin(input: {
   if (existing) {
     const passwordMatches = passwordMatchesHash(input.password, existing.passwordSalt, existing.passwordHash);
     if (!passwordMatches || existing.disabled) return refused(email, "invalid_credentials", "Identifiants refusés.");
-    const totp = checkTotp(input.env, input.totpCode, input.now);
-    if (!totp.ok) return refused(email, "invalid_totp", "Identifiants refusés.");
-    return issueLogin({
+    const factor = secondFactor(input.db, existing.id, sessionSecret, input.env, input.totpCode, input.now);
+    if (!factor.ok) return refused(email, "invalid_totp", "Identifiants refusés.");
+    const result = await issueLogin({
       secret: sessionSecret,
       userId: existing.id,
       role: existing.role,
-      mfaSatisfied: totp.mfaSatisfied,
+      mfaSatisfied: factor.mfaSatisfied,
       now: input.now,
       secure: input.secure,
     });
+    if (result.ok) {
+      recordAdminAudit(input.db, {
+        actorId: existing.id,
+        actorRole: existing.role,
+        action: "session.opened",
+        subjectId: existing.id,
+        at: input.now,
+      });
+    }
+    return result;
   }
 
   const expectedEmail = input.env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase() ?? "";
@@ -177,7 +189,7 @@ export async function attemptLogin(input: {
     now: input.now,
   });
   if (!created.ok) return refused(email, "invalid_credentials", "Identifiants refusés.");
-  return issueLogin({
+  const result = await issueLogin({
     secret: sessionSecret,
     userId: created.account.id,
     role: "owner",
@@ -185,4 +197,34 @@ export async function attemptLogin(input: {
     now: input.now,
     secure: input.secure,
   });
+  if (result.ok) {
+    recordAdminAudit(input.db, {
+      actorId: created.account.id,
+      actorRole: "owner",
+      action: "session.opened",
+      subjectId: created.account.id,
+      at: input.now,
+    });
+  }
+  return result;
+}
+
+function secondFactor(
+  db: DatabaseSync,
+  userId: string,
+  sessionSecret: string,
+  env: { readonly [key: string]: string | undefined },
+  code: string,
+  now: Date,
+): { ok: true; mfaSatisfied: boolean } | { ok: false } {
+  const key = totpKeyFromSessionSecret(sessionSecret);
+  if (key) {
+    const confirmed = confirmedTotpSecret(db, userId, key);
+    if (confirmed === "unreadable") return { ok: false };
+    if (confirmed !== "missing") {
+      if (!verifyTotp(confirmed, code.trim(), now.getTime())) return { ok: false };
+      return { ok: true, mfaSatisfied: true };
+    }
+  }
+  return checkTotp(env, code, now);
 }

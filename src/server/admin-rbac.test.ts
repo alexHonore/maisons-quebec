@@ -28,6 +28,7 @@ describe("comptes admin", () => {
     const db = freshDb();
     assert.equal(
       createAdminAccount(db, {
+        actorId: "personne",
         actorRole: "owner",
         email: "editeur@example.com",
         password: "phrase-de-test-seulement",
@@ -47,6 +48,7 @@ describe("comptes admin", () => {
     for (const role of ADMIN_ROLES) {
       if (role === "owner") continue;
       const created = createAdminAccount(db, {
+        actorId: owner.ok ? owner.account.id : "personne",
         actorRole: "owner",
         email: `${role}@example.com`,
         password: "phrase-de-test-seulement",
@@ -59,6 +61,7 @@ describe("comptes admin", () => {
     }
     assert.equal(
       createAdminAccount(db, {
+        actorId: owner.ok ? owner.account.id : "personne",
         actorRole: "editor",
         email: "autre-editeur@example.com",
         password: "phrase-de-test-seulement",
@@ -86,6 +89,7 @@ describe("comptes admin", () => {
     if (!owner.ok) return;
     assert.equal(disableAdminAccount(db, { actorRole: "owner", actorId: owner.account.id, targetId: owner.account.id }).ok, false);
     const editor = createAdminAccount(db, {
+      actorId: owner.account.id,
       actorRole: "owner",
       email: "editeur@example.com",
       password: "phrase-de-test-seulement",
@@ -104,7 +108,7 @@ describe("comptes admin", () => {
 describe("permissions", () => {
   it("applique le moindre privilège sur les cinq rôles", () => {
     const matrix: Record<AdminRole, Array<keyof typeof ADMIN_PERMISSIONS>> = {
-      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo"],
+      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo", "audit.read"],
       editor: ["settings.copy.write"],
       analyst: ["jobs.read"],
       integration_manager: [],

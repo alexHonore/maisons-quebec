@@ -59,6 +59,50 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS job_runs;",
   },
+  {
+    version: "004_admin_totp",
+    up: `
+      CREATE TABLE admin_totp (
+        user_id TEXT PRIMARY KEY,
+        secret_ciphertext TEXT NOT NULL,
+        confirmed INTEGER NOT NULL DEFAULT 0 CHECK (confirmed IN (0, 1)),
+        created_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS admin_totp;",
+  },
+  {
+    version: "005_job_queue",
+    up: `
+      CREATE TABLE job_queue (
+        id TEXT PRIMARY KEY,
+        job_name TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+        attempts INTEGER NOT NULL,
+        max_attempts INTEGER NOT NULL,
+        actor_role TEXT NOT NULL CHECK (actor_role IN ('owner', 'editor', 'analyst', 'integration_manager', 'automation_manager')),
+        available_at TEXT NOT NULL,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS job_queue;",
+  },
+  {
+    version: "006_admin_audit",
+    up: `
+      CREATE TABLE admin_audit (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        actor_role TEXT NOT NULL,
+        action TEXT NOT NULL,
+        subject_id TEXT,
+        at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS admin_audit;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

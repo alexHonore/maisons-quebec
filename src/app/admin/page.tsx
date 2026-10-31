@@ -4,6 +4,8 @@ import { unauthorized } from "next/navigation";
 import { ADMIN_ROLE_LABELS } from "@/server/admin-access";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
+import { settingsDatabase } from "@/server/public-site";
+import { isPrivilegedAdminRole, renderTotpStatus, totpAccountState } from "@/server/totp-vault";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +18,19 @@ export default async function AdminPage() {
   const live = await readLiveAdmin();
   if (!live.ok) unauthorized();
   const { user } = live;
+  const totpText = renderTotpStatus({
+    state: totpAccountState(settingsDatabase(process.env), user.id),
+    sessionMfa: user.mfaSatisfied,
+    globalSecretConfigured: Boolean(process.env.ADMIN_TOTP_SECRET?.trim()),
+  });
 
   return (
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Administration</h1>
       <p>
-        Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}.
-        {user.mfaSatisfied
-          ? " Le code TOTP a été vérifié pour cette session."
-          : " Cette session n'est pas multifacteur. Le secret TOTP reste celui de l'environnement, pas un secret par compte."}
+        Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}. {totpText}
       </p>
-      <p>Les leads et les webhooks ne sont pas disponibles. Le rôle integration_manager n&apos;a aucune action tant que ces écrans n&apos;existent pas.</p>
+      <p>Les leads et les webhooks ne sont pas disponibles.</p>
       <ul className="nav">
         {roleCan(user.role, "settings.copy.write") || roleCan(user.role, "settings.regulatory.write") ? (
           <li>
@@ -41,6 +45,16 @@ export default async function AdminPage() {
         {roleCan(user.role, "jobs.read") ? (
           <li>
             <Link href="/admin/jobs">Journal des contrôles</Link>
+          </li>
+        ) : null}
+        {isPrivilegedAdminRole(user.role) ? (
+          <li>
+            <Link href="/admin/securite">Second facteur</Link>
+          </li>
+        ) : null}
+        {roleCan(user.role, "audit.read") ? (
+          <li>
+            <Link href="/admin/audit">Journal d&apos;audit</Link>
           </li>
         ) : null}
       </ul>

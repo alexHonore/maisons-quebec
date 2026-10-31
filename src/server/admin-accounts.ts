@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { ADMIN_ROLES, type AdminRole } from "./admin-access";
+import { recordAdminAudit } from "./admin-audit";
 
 export const MIN_ADMIN_PASSWORD_LENGTH = 12;
 
@@ -105,6 +106,7 @@ export function createOwnerFromBootstrap(
     db.exec("COMMIT");
     const account = findAdminById(db, id);
     if (!account) throw new Error("Compte propriétaire illisible après création.");
+    recordAdminAudit(db, { actorId: id, actorRole: "owner", action: "account.created", subjectId: id, at: input.now });
     return { ok: true, account };
   } catch (error) {
     db.exec("ROLLBACK");
@@ -114,7 +116,7 @@ export function createOwnerFromBootstrap(
 
 export function createAdminAccount(
   db: DatabaseSync,
-  input: { actorRole: AdminRole; email: string; password: string; role: AdminRole; now: Date },
+  input: { actorId: string; actorRole: AdminRole; email: string; password: string; role: AdminRole; now: Date },
 ): { ok: true; account: AdminAccount } | { ok: false; reason: "forbidden" | "bootstrap_required" | "email_invalid" | "email_taken" | "password_too_short" | "role_invalid" } {
   if (input.actorRole !== "owner") return { ok: false, reason: "forbidden" };
   if (countOwners(db) === 0) return { ok: false, reason: "bootstrap_required" };
@@ -131,6 +133,13 @@ export function createAdminAccount(
   ).run(id, email, secret.hash, secret.salt, input.role, input.now.toISOString());
   const account = findAdminById(db, id);
   if (!account) throw new Error("Compte admin illisible après création.");
+  recordAdminAudit(db, {
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    action: "account.created",
+    subjectId: id,
+    at: input.now,
+  });
   return { ok: true, account };
 }
 
@@ -143,5 +152,12 @@ export function disableAdminAccount(
   if (!target) return { ok: false, reason: "missing" };
   if (target.role === "owner" && countOwners(db) <= 1) return { ok: false, reason: "last_owner" };
   db.prepare("UPDATE admin_users SET disabled = 1 WHERE id = ?").run(target.id);
+  recordAdminAudit(db, {
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    action: "account.disabled",
+    subjectId: target.id,
+    at: new Date(),
+  });
   return { ok: true };
 }

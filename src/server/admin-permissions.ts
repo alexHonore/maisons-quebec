@@ -7,6 +7,7 @@ export const ADMIN_PERMISSIONS = {
   "users.manage": ["owner"],
   "jobs.read": ["owner", "analyst", "automation_manager"],
   "jobs.run_demo": ["owner", "automation_manager"],
+  "audit.read": ["owner"],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

@@ -31,14 +31,15 @@ npm run build
 - Réglages du site dans `data/site-settings.sqlite` (ou `SITE_SETTINGS_PATH`). Migration `001_site_settings`, annulable. Aucun permis n'est inséré par la migration.
 - `/admin/login` : le premier propriétaire est créé seulement par `ADMIN_BOOTSTRAP_EMAIL` et `ADMIN_BOOTSTRAP_PASSWORD`, si aucun propriétaire n'existe. Ces valeurs sont vides dans `.env.example`. Sans elles, la connexion répond 401. Les comptes suivants sont dans SQLite.
 - Rôles : `owner`, `editor`, `analyst`, `integration_manager`, `automation_manager`. Le rôle effectif est relu en base. L'éditeur peut modifier le texte public, pas les permis. L'analyste lit le journal. Le gestionnaire d'automatisation peut lancer le contrôle. Le gestionnaire d'intégrations n'a pas d'action tant que les webhooks n'existent pas. Seul le propriétaire gère les comptes et les champs réglementaires.
-- `/admin/jobs` : journal du contrôle « champs vides ou renseignés ». Il ne recopie ni permis, ni courriel, ni statistique.
+- `/admin/jobs` : file persistée (enfiler, exécuter, échec, reprise) et journal du contrôle « champs vides ou renseignés ». Ni permis, ni courriel, ni statistique.
+- `/admin/audit` : qui (identifiant), quoi, quand. Pas de courriel, pas de permis, pas de secret.
 - Cookie `mq_admin_session` : `HttpOnly`, `SameSite=Lax`, `Secure` seulement en HTTPS. `/admin`, `/admin/settings`, `/admin/team` et `/admin/jobs` répondent 401 sans session.
-- TOTP : inchangé. Secret vide : session sans second facteur. Secret rempli : code exigé.
+- TOTP par compte privilégié (`owner`, `integration_manager`, `automation_manager`) : le secret est chiffré dans SQLite et n'est affiché qu'une fois, à l'enrôlement. Si `ADMIN_TOTP_SECRET` est vide et qu'aucun facteur n'est confirmé, la session n'est pas multifacteur. Le texte dit « MFA non actif ».
 
 ## Ce qui n'est pas fait
 
-- TOTP par compte. Le second facteur reste le secret d'environnement, partagé.
-- Plusieurs facteurs, audit complet, jobs en file d'attente. Le journal actuel exécute le contrôle dans la requête.
+- TOTP pour les rôles non privilégiés. Le secret global reste un trou tant qu'il est vide et qu'aucun facteur de compte n'est confirmé.
+- Worker séparé de la requête, sauvegardes, pages de quartiers.
 - Leads, formulaires de contact, rendez-vous, webhooks, CRM, écran du calculateur.
 - Pages de quartiers, guides rédigés, SEO complet, données structurées d'agence.
 - Postgres, studio IA, images, analytique, automatisations.
