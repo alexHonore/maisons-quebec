@@ -108,8 +108,8 @@ describe("comptes admin", () => {
 describe("permissions", () => {
   it("applique le moindre privilège sur les cinq rôles", () => {
     const matrix: Record<AdminRole, Array<keyof typeof ADMIN_PERMISSIONS>> = {
-      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo", "audit.read", "leads.read", "leads.aggregate", "webhooks.manage", "appointments.confirm", "events.read", "events.manage", "content.write", "content.preview", "content.publish", "prompts.read", "prompts.write", "analytics.read", "automations.manage"],
-      editor: ["settings.copy.write", "content.write", "content.preview", "prompts.read", "prompts.write"],
+      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo", "audit.read", "leads.read", "leads.aggregate", "webhooks.manage", "appointments.confirm", "events.read", "events.manage", "content.write", "content.preview", "content.publish", "media.manage", "prompts.read", "prompts.write", "analytics.read", "automations.manage"],
+      editor: ["settings.copy.write", "content.write", "content.preview", "media.manage", "prompts.read", "prompts.write"],
       analyst: ["jobs.read", "leads.aggregate", "events.read", "analytics.read"],
       integration_manager: ["webhooks.manage", "events.read", "events.manage"],
       automation_manager: ["jobs.read", "jobs.run_demo", "automations.manage"],

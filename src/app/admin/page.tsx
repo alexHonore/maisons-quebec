@@ -42,6 +42,11 @@ export default async function AdminPage() {
             <Link href="/admin/contenu">Pages de contenu</Link>
           </li>
         ) : null}
+        {roleCan(user.role, "media.manage") ? (
+          <li>
+            <Link href="/admin/medias">Médias</Link>
+          </li>
+        ) : null}
         {roleCan(user.role, "prompts.read") ? (
           <li>
             <Link href="/admin/prompts">Prompt L0</Link>

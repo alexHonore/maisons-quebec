@@ -26,6 +26,8 @@ export const AUDIT_ACTIONS = [
   "automation.saved",
   "automation.enabled",
   "automation.disabled",
+  "media.saved",
+  "media.attached",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

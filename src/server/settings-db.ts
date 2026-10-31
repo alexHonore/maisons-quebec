@@ -327,6 +327,31 @@ export const MIGRATIONS = [
       DROP TABLE IF EXISTS automations;
     `,
   },
+  {
+    version: "015_media_assets",
+    up: `
+      CREATE TABLE media_assets (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        license TEXT NOT NULL,
+        author TEXT NOT NULL,
+        source TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL
+      );
+      CREATE TABLE content_media (
+        id TEXT PRIMARY KEY,
+        page_id TEXT NOT NULL,
+        asset_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (page_id, asset_id)
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS content_media;
+      DROP TABLE IF EXISTS media_assets;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

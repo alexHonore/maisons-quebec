@@ -15,6 +15,7 @@ export const ADMIN_PERMISSIONS = {
   "events.read": ["owner", "analyst", "integration_manager"],
   "events.manage": ["owner", "integration_manager"],
   "content.write": ["owner", "editor"],
+  "media.manage": ["owner", "editor"],
   "content.preview": ["owner", "editor"],
   "content.publish": ["owner"],
   "prompts.read": ["owner", "editor"],

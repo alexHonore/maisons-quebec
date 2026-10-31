@@ -36,6 +36,7 @@ npm run build
 - Rôles inchangés. Le propriétaire voit les demandes. L'analyste en voit l'état, sans nom ni courriel. L'éditeur ne les voit pas. Le propriétaire et le gestionnaire d'intégrations enregistrent une destination de webhook. Le secret n'est plus affiché ensuite. Sans destination, ou si l'envoi échoue, la demande reste en attente.
 - `/admin/jobs` : file persistée (enfiler, exécuter, échec, reprise) et journal du contrôle « champs vides ou renseignés ». Ni permis, ni courriel, ni statistique.
 - `/admin/contenu` : brouillon puis publication, avec une version à chaque publication. Le propriétaire peut restaurer une version sans effacer l'historique. Le public lit `/guides/[slug]` dans SQLite. Un brouillon répond 404. Une année ne bloque pas l'indexation. Un prix, un taux ou un décompte sans source nommée est `noindex`.
+- `/admin/medias` : fiches pour le propriétaire et l'éditeur. Une fiche exige une licence, un auteur et une source. Sans licence, elle ne peut pas être associée à une page. Si `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` ou `IMAGE_GENERATION_API_KEY` est vide, la recherche et la génération répondent « à connecter », n'appellent rien et n'enregistrent aucune image.
 - `/admin/prompts` : prompt L0 version 1.0.0, en lecture seule, avec son hash. L1 et L2 s'enregistrent à part, par le propriétaire ou l'éditeur, une version à chaque sauvegarde. Sans `OPENROUTER_API_KEY`, « Générer » répond « à connecter » et n'écrit aucun article.
 - Trois scores de préparation, SEO, citabilité et conversion, seuil 70. Sous le seuil, le propriétaire ne publie pas. Une page déjà publique passe en `noindex`. Ce ne sont pas des résultats observés.
 - `/admin/analytics` : période choisie, fuseau America/Toronto. Le propriétaire et l'analyste voient les vues de pages publiques et les demandes déjà enregistrées. Une période sans événement est un trou, pas un zéro. Les exports JSON, CSV et PDF portent les mêmes totaux. Sessions, visiteurs uniques, rétention, temps engagé, Search Console et taux par page restent des trous.
@@ -50,7 +51,7 @@ npm run build
 - Worker séparé de la requête, sauvegardes, pages de quartiers.
 - Le calendrier externe, le radar de prix, le rendement locatif, les barèmes officiels, les filtres de destination et un CRM.
 - Versions de pages, redirections, médias, pages de quartiers sourcées, SEO complet, données structurées d'agence.
-- Postgres, images, Search Console, sessions, visiteurs uniques, rétention, temps engagé, éditeur graphique, publication automatique, appel n8n, WebMCP, assistant conversationnel.
+- Postgres, fichiers image, Pexels, Unsplash et génération branchés, Search Console, sessions, visiteurs uniques, rétention, temps engagé, éditeur graphique, publication automatique, appel n8n, WebMCP, assistant conversationnel.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.
 
 ## Configuration
