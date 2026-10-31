@@ -1,16 +1,22 @@
 "use server";
 
-import { unauthorized, redirect } from "next/navigation";
-import { readCurrentAdmin } from "@/server/current-admin";
+import { forbidden, redirect, unauthorized } from "next/navigation";
+import { readLiveAdmin } from "@/server/current-admin";
+import { planSettingsUpdate } from "@/server/admin-permissions";
 import { settingsDatabase } from "@/server/public-site";
-import { SETTING_KEYS, saveSettings, type SettingKey } from "@/server/settings-db";
+import { readStoredSettings, saveSettings, SETTING_KEYS, type SettingKey } from "@/server/settings-db";
 
 export async function saveSiteSettingsAction(formData: FormData) {
-  const decision = await readCurrentAdmin();
-  if (!decision.allowed) unauthorized();
-  const values = Object.fromEntries(
-    SETTING_KEYS.map((key) => [key, String(formData.get(key) ?? "")]),
-  ) as Record<SettingKey, string>;
-  const result = saveSettings(settingsDatabase(process.env), values);
+  const live = await readLiveAdmin();
+  if (!live.ok) unauthorized();
+  const db = settingsDatabase(process.env);
+  const current = readStoredSettings(db);
+  const submitted: Partial<Record<SettingKey, string>> = {};
+  for (const key of SETTING_KEYS) {
+    if (formData.has(key)) submitted[key] = String(formData.get(key) ?? "");
+  }
+  const plan = planSettingsUpdate(live.user.role, current, submitted);
+  if (!plan.ok) forbidden();
+  const result = saveSettings(db, plan.values);
   redirect(result.ok ? "/admin/settings?enregistre=1" : "/admin/settings?erreur=1");
 }

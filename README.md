@@ -29,16 +29,19 @@ npm run build
 - Accueil et pages `/vendre`, `/acheter`, `/marche`, `/outils`, `/guides`, `/methodologie`, `/contact`.
 - Module `src/domain/sale-proceeds.ts` : produit net déterministe. L'écran du calculateur n'est pas ouvert.
 - Réglages du site dans `data/site-settings.sqlite` (ou `SITE_SETTINGS_PATH`). Migration `001_site_settings`, annulable. Aucun permis n'est inséré par la migration.
-- `/admin/login` : compte d'amorçage lu dans `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD` et `ADMIN_SESSION_SECRET`. Ces valeurs sont vides dans `.env.example`. Sans elles, la connexion répond 401.
-- Cookie `mq_admin_session` : `HttpOnly`, `SameSite=Lax`, `Secure` seulement en HTTPS. `/admin` et `/admin/settings` répondent 401 sans ce cookie.
-- TOTP : si `ADMIN_TOTP_SECRET` est vide, la session est créée sans second facteur et l'admin le dit. S'il est rempli, un code faux est refusé et un code valide marque la session comme vérifiée.
+- `/admin/login` : le premier propriétaire est créé seulement par `ADMIN_BOOTSTRAP_EMAIL` et `ADMIN_BOOTSTRAP_PASSWORD`, si aucun propriétaire n'existe. Ces valeurs sont vides dans `.env.example`. Sans elles, la connexion répond 401. Les comptes suivants sont dans SQLite.
+- Rôles : `owner`, `editor`, `analyst`, `integration_manager`, `automation_manager`. Le rôle effectif est relu en base. L'éditeur peut modifier le texte public, pas les permis. L'analyste lit le journal. Le gestionnaire d'automatisation peut lancer le contrôle. Le gestionnaire d'intégrations n'a pas d'action tant que les webhooks n'existent pas. Seul le propriétaire gère les comptes et les champs réglementaires.
+- `/admin/jobs` : journal du contrôle « champs vides ou renseignés ». Il ne recopie ni permis, ni courriel, ni statistique.
+- Cookie `mq_admin_session` : `HttpOnly`, `SameSite=Lax`, `Secure` seulement en HTTPS. `/admin`, `/admin/settings`, `/admin/team` et `/admin/jobs` répondent 401 sans session.
+- TOTP : inchangé. Secret vide : session sans second facteur. Secret rempli : code exigé.
 
 ## Ce qui n'est pas fait
 
-- Rôles réellement appliqués, plusieurs comptes, base d'utilisateurs. Le compte d'amorçage est unique et vit dans l'environnement.
+- TOTP par compte. Le second facteur reste le secret d'environnement, partagé.
+- Plusieurs facteurs, audit complet, jobs en file d'attente. Le journal actuel exécute le contrôle dans la requête.
 - Leads, formulaires de contact, rendez-vous, webhooks, CRM, écran du calculateur.
 - Pages de quartiers, guides rédigés, SEO complet, données structurées d'agence.
-- Postgres, jobs, studio IA, images, analytique, automatisations.
+- Postgres, studio IA, images, analytique, automatisations.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.
 
 ## Configuration

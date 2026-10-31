@@ -29,6 +29,36 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS site_settings;",
   },
+  {
+    version: "002_admin_users",
+    up: `
+      CREATE TABLE admin_users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'analyst', 'integration_manager', 'automation_manager')),
+        disabled INTEGER NOT NULL DEFAULT 0 CHECK (disabled IN (0, 1)),
+        created_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS admin_users;",
+  },
+  {
+    version: "003_job_runs",
+    up: `
+      CREATE TABLE job_runs (
+        id TEXT PRIMARY KEY,
+        job_name TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('succeeded', 'failed')),
+        actor_role TEXT NOT NULL CHECK (actor_role IN ('owner', 'editor', 'analyst', 'integration_manager', 'automation_manager')),
+        started_at TEXT NOT NULL,
+        finished_at TEXT NOT NULL,
+        summary TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS job_runs;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

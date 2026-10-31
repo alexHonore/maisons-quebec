@@ -1,4 +1,5 @@
 import { attemptLogin, renderLoginDocument } from "@/server/admin-login";
+import { settingsDatabase } from "@/server/public-site";
 
 function requestIsSecure(request: Request): boolean {
   const forwarded = request.headers.get("x-forwarded-proto");
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     now: new Date(),
     secure: requestIsSecure(request),
     env: process.env,
+    db: settingsDatabase(process.env),
   });
   const headers = htmlHeaders();
   if (result.ok) {

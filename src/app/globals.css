@@ -291,12 +291,14 @@ section { padding: 1.15rem 0; }
 
 .form-grid input,
 .form-grid textarea,
+.form-grid select,
 .button {
   font: inherit;
 }
 
 .form-grid input,
-.form-grid textarea {
+.form-grid textarea,
+.form-grid select {
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 0.6rem;

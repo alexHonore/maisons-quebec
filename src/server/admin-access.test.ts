@@ -47,11 +47,7 @@ describe("authorizeAdminRequest", () => {
     assert.equal(decision.session.subject, "fondateur");
     assert.equal(decision.session.role, "editor");
     assert.equal(decision.session.mfaSatisfied, false);
-    assert.deepEqual(decision.gaps, [
-      "mfa_not_enforced",
-      "rbac_not_enforced",
-      "no_persistent_user_store",
-    ]);
+    assert.deepEqual(decision.gaps, ["mfa_not_enforced"]);
   });
 
   it("vérifie la signature avec un HMAC indépendant", async () => {

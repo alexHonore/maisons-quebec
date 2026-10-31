@@ -1,8 +1,15 @@
+import { DatabaseSync } from "node:sqlite";
 import { createHash, scryptSync, timingSafeEqual } from "node:crypto";
+import {
+  createOwnerFromBootstrap,
+  findAdminByEmail,
+  passwordMatchesHash,
+} from "./admin-accounts";
 import {
   MAX_ADMIN_SESSION_MS,
   issueAdminSessionCookie,
   serializeAdminCookie,
+  type AdminRole,
 } from "./admin-access";
 import { decodeBase32, verifyTotp } from "./totp";
 
@@ -59,7 +66,7 @@ export function renderLoginDocument(input: { failed: boolean; email: string; not
 <body>
   <main>
     <h1>Connexion à l'administration</h1>
-    <p>Le compte d'amorçage vient des variables d'environnement. Aucun mot de passe n'est inscrit dans le dépôt.</p>
+    <p>Le premier propriétaire est créé seulement par le compte d'amorçage, à la première connexion valide. Les autres comptes sont enregistrés dans la base locale.</p>
     <p>Si le secret TOTP est vide, le second facteur n'est pas actif. La page ne dira pas qu'une session existe tant que le serveur n'en a pas créé une.</p>
     ${message}
     <form method="post" action="/admin/login">
@@ -74,6 +81,50 @@ export function renderLoginDocument(input: { failed: boolean; email: string; not
 </html>`;
 }
 
+function refused(email: string, reason: LoginFailure, notice: string): LoginResult {
+  return {
+    ok: false,
+    status: 401,
+    reason,
+    body: renderLoginDocument({ failed: true, email, notice }),
+  };
+}
+
+function checkTotp(env: { readonly [key: string]: string | undefined }, code: string, now: Date): { ok: true; mfaSatisfied: boolean } | { ok: false } {
+  const totpSecret = env.ADMIN_TOTP_SECRET?.trim() ?? "";
+  if (totpSecret === "") return { ok: true, mfaSatisfied: false };
+  const decoded = decodeBase32(totpSecret);
+  if (!decoded || !verifyTotp(decoded, code.trim(), now.getTime())) return { ok: false };
+  return { ok: true, mfaSatisfied: true };
+}
+
+async function issueLogin(input: {
+  secret: string;
+  userId: string;
+  role: AdminRole;
+  mfaSatisfied: boolean;
+  now: Date;
+  secure: boolean;
+}): Promise<LoginResult> {
+  const value = await issueAdminSessionCookie({
+    secret: input.secret,
+    subject: input.userId,
+    role: input.role,
+    expiresAt: new Date(input.now.getTime() + MAX_ADMIN_SESSION_MS),
+    mfaSatisfied: input.mfaSatisfied,
+  });
+  return {
+    ok: true,
+    status: 303,
+    mfaSatisfied: input.mfaSatisfied,
+    cookie: serializeAdminCookie(value, {
+      maxAgeSeconds: Math.floor(MAX_ADMIN_SESSION_MS / 1000),
+      secure: input.secure,
+    }),
+    body: "",
+  };
+}
+
 export async function attemptLogin(input: {
   email: string;
   password: string;
@@ -81,65 +132,57 @@ export async function attemptLogin(input: {
   now: Date;
   secure: boolean;
   env: { readonly [key: string]: string | undefined };
+  db: DatabaseSync;
 }): Promise<LoginResult> {
+  const sessionSecret = input.env.ADMIN_SESSION_SECRET?.trim() ?? "";
+  const email = input.email.trim().toLowerCase();
+  if (sessionSecret === "") {
+    return refused(email, "auth_not_configured", "La connexion n'est pas configurée. Le secret de session est vide.");
+  }
+
+  const existing = findAdminByEmail(input.db, email);
+  if (existing) {
+    const passwordMatches = passwordMatchesHash(input.password, existing.passwordSalt, existing.passwordHash);
+    if (!passwordMatches || existing.disabled) return refused(email, "invalid_credentials", "Identifiants refusés.");
+    const totp = checkTotp(input.env, input.totpCode, input.now);
+    if (!totp.ok) return refused(email, "invalid_totp", "Identifiants refusés.");
+    return issueLogin({
+      secret: sessionSecret,
+      userId: existing.id,
+      role: existing.role,
+      mfaSatisfied: totp.mfaSatisfied,
+      now: input.now,
+      secure: input.secure,
+    });
+  }
+
   const expectedEmail = input.env.ADMIN_BOOTSTRAP_EMAIL?.trim().toLowerCase() ?? "";
   const expectedPassword = input.env.ADMIN_BOOTSTRAP_PASSWORD ?? "";
-  const sessionSecret = input.env.ADMIN_SESSION_SECRET?.trim() ?? "";
-  const totpSecret = input.env.ADMIN_TOTP_SECRET?.trim() ?? "";
-  const email = input.email.trim().toLowerCase();
-
-  if (expectedEmail === "" || expectedPassword === "" || sessionSecret === "") {
-    return {
-      ok: false,
-      status: 401,
-      reason: "auth_not_configured",
-      body: renderLoginDocument({
-        failed: true,
-        email,
-        notice: "La connexion n'est pas configurée. Le compte d'amorçage ou le secret de session est vide.",
-      }),
-    };
+  if (expectedEmail === "" || expectedPassword === "") {
+    return refused(
+      email,
+      "auth_not_configured",
+      "La connexion n'est pas configurée. Le compte d'amorçage ou le secret de session est vide.",
+    );
   }
-
   const emailMatches = sameText(email, expectedEmail);
   const passwordMatches = samePassword(input.password, expectedPassword);
-  let totpMatches = true;
-  let mfaSatisfied = false;
-  if (totpSecret !== "") {
-    const decoded = decodeBase32(totpSecret);
-    totpMatches = decoded !== null && verifyTotp(decoded, input.totpCode.trim(), input.now.getTime());
-    mfaSatisfied = totpMatches;
-  }
+  if (!emailMatches || !passwordMatches) return refused(email, "invalid_credentials", "Identifiants refusés.");
+  const totp = checkTotp(input.env, input.totpCode, input.now);
+  if (!totp.ok) return refused(email, "invalid_totp", "Identifiants refusés.");
 
-  if (!emailMatches || !passwordMatches || !totpMatches) {
-    return {
-      ok: false,
-      status: 401,
-      reason: totpSecret !== "" && emailMatches && passwordMatches ? "invalid_totp" : "invalid_credentials",
-      body: renderLoginDocument({
-        failed: true,
-        email,
-        notice: "Identifiants refusés.",
-      }),
-    };
-  }
-
-  const expiresAt = new Date(input.now.getTime() + MAX_ADMIN_SESSION_MS);
-  const value = await issueAdminSessionCookie({
-    secret: sessionSecret,
-    subject: expectedEmail,
-    role: "owner",
-    expiresAt,
-    mfaSatisfied,
+  const created = createOwnerFromBootstrap(input.db, {
+    email: expectedEmail,
+    password: expectedPassword,
+    now: input.now,
   });
-  return {
-    ok: true,
-    status: 303,
-    mfaSatisfied,
-    cookie: serializeAdminCookie(value, {
-      maxAgeSeconds: Math.floor(MAX_ADMIN_SESSION_MS / 1000),
-      secure: input.secure,
-    }),
-    body: "",
-  };
+  if (!created.ok) return refused(email, "invalid_credentials", "Identifiants refusés.");
+  return issueLogin({
+    secret: sessionSecret,
+    userId: created.account.id,
+    role: "owner",
+    mfaSatisfied: totp.mfaSatisfied,
+    now: input.now,
+    secure: input.secure,
+  });
 }

@@ -27,11 +27,7 @@ export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
   automation_manager: "automatisations",
 };
 
-export const ADMIN_GAPS = [
-  "mfa_not_enforced",
-  "rbac_not_enforced",
-  "no_persistent_user_store",
-] as const;
+export const ADMIN_GAPS = ["mfa_not_enforced"] as const;
 
 export type AdminGap = (typeof ADMIN_GAPS)[number];
 
@@ -209,9 +205,7 @@ export async function authorizeAdminRequest(input: {
       expiresAt: new Date(payload.exp).toISOString(),
       mfaSatisfied: payload.mfa,
     },
-    gaps: payload.mfa
-      ? ["rbac_not_enforced", "no_persistent_user_store"]
-      : ["mfa_not_enforced", "rbac_not_enforced", "no_persistent_user_store"],
+    gaps: payload.mfa ? [] : ["mfa_not_enforced"],
   };
 }
 
