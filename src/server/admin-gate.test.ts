@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import { adminPathRequiresSession } from "./admin-gate";
 
 describe("garde des chemins admin", () => {
-  it("laisse passer la connexion et la sortie, et ferme le reste", () => {
+  it("ferme l'admin, et laisse le site public ainsi que la connexion", () => {
+    assert.equal(adminPathRequiresSession("/"), false);
+    assert.equal(adminPathRequiresSession("/vendre/calculateur-produit-net"), false);
     assert.equal(adminPathRequiresSession("/admin/login"), false);
     assert.equal(adminPathRequiresSession("/admin/logout"), false);
     assert.equal(adminPathRequiresSession("/admin"), true);

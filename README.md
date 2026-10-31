@@ -20,7 +20,10 @@ npm test
 npm run lint
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
+
+`npm run test:e2e` lance les trois parcours Playwright contre l'application déjà construite. Il ne couvre pas le reste du jalon 8.
 
 `npm test` exécute le calcul du produit net, les pages piliers, l'identité réglementaire, les migrations SQLite, le TOTP et la connexion admin.
 
