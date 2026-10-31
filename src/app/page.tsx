@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { buildHomeContent, HOME_DESCRIPTION, HOME_TITLE } from "@/content/home";
-import { readRegulatoryIdentity } from "@/domain/regulatory-identity";
+import Link from "next/link";
+import { HOME_DESCRIPTION, HOME_TITLE } from "@/content/home";
+import { PublicFrame } from "@/components/public-frame";
 import { readSiteUrl } from "@/domain/site-url";
+import { loadPublicSite } from "@/server/public-site";
 
 export const dynamic = "force-dynamic";
 
@@ -19,19 +21,8 @@ export const metadata: Metadata = {
   },
 };
 
-function Mark() {
-  return (
-    <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="#16342c" />
-      <path d="M6 15.2 16 7l10 8.2" stroke="#f3efe6" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M9 14.2V24h14V14.2" stroke="#f3efe6" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M14 24v-5.5h4V24" stroke="#e2b56a" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
 export default function Home() {
-  const content = buildHomeContent(readRegulatoryIdentity(process.env));
+  const { content } = loadPublicSite(process.env);
   const site = readSiteUrl(process.env);
   const jsonLd = {
     "@context": "https://schema.org",
@@ -43,35 +34,7 @@ export default function Home() {
   };
 
   return (
-    <>
-      <a className="skip" href="#contenu">
-        Aller au contenu
-      </a>
-      <header className="site-header">
-        <div className="wrap header-row">
-          <a className="brand" href="#contenu">
-            <Mark />
-            <span>
-              <span className="brand-name">{content.brand}</span>
-              <span className="brand-note">{content.brandNote}</span>
-            </span>
-          </a>
-          <a className="status-chip" href="#identification">
-            {content.identityStatus}
-          </a>
-        </div>
-        <div className="wrap nav-row">
-          <nav aria-label="Sections">
-            <ul className="nav">
-              {content.nav.map((item) => (
-                <li key={item.href}>
-                  <a href={item.href}>{item.label}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      </header>
+    <PublicFrame content={content}>
       <main id="contenu">
         <div className="wrap hero">
           <div>
@@ -91,10 +54,10 @@ export default function Home() {
         <div className="wrap">
           <div className="actions">
             {content.hero.actions.map((action) => (
-              <a className="action" key={action.href + action.label} href={action.href}>
+              <Link className="action" key={action.href + action.label} href={action.href}>
                 <strong>{action.label}</strong>
                 <span>{action.description}</span>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -103,6 +66,9 @@ export default function Home() {
           <div className="wrap panel">
             <h2>{content.tool.title}</h2>
             <p>{content.tool.body}</p>
+            <p>
+              <Link href="/outils">Lire la page des outils</Link>
+            </p>
           </div>
         </section>
 
@@ -113,12 +79,18 @@ export default function Home() {
               {content.sell.paragraphs.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
+              <p>
+                <Link href="/vendre">Lire la page Vendre</Link>
+              </p>
             </article>
             <article id="acheter" className="panel">
               <h2>{content.buy.title}</h2>
               {content.buy.paragraphs.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
+              <p>
+                <Link href="/acheter">Lire la page Acheter</Link>
+              </p>
             </article>
           </div>
         </section>
@@ -135,6 +107,9 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+            <p>
+              <Link href="/marche">Lire la page Marché</Link>
+            </p>
           </div>
         </section>
 
@@ -166,6 +141,9 @@ export default function Home() {
             <article id="guides" className="panel">
               <h2>{content.guides.title}</h2>
               <p>{content.guides.body}</p>
+              <p>
+                <Link href="/guides">Lire la page Guides</Link>
+              </p>
             </article>
           </div>
         </section>
@@ -178,6 +156,9 @@ export default function Home() {
                 <li key={item}>{item}</li>
               ))}
             </ul>
+            <p>
+              <Link href="/methodologie">Lire la page Méthode</Link>
+            </p>
           </div>
         </section>
 
@@ -190,39 +171,17 @@ export default function Home() {
             <article id="contact" className="panel">
               <h2>{content.contact.title}</h2>
               <p>{content.contact.body}</p>
+              <p>
+                <Link href="/contact">Lire la page Contact</Link>
+              </p>
             </article>
           </div>
         </section>
-
-        <section id="identification">
-          <div className="wrap panel">
-            <h2>{content.identity.title}</h2>
-            <p>{content.identity.intro}</p>
-            <dl>
-              {content.identity.fields.map((field) => (
-                <div className="field" data-state={field.state} key={field.id}>
-                  <dt>{field.label}</dt>
-                  <dd>{field.display}</dd>
-                </div>
-              ))}
-            </dl>
-            <p>{content.identity.caveat}</p>
-          </div>
-        </section>
       </main>
-      <footer className="site-footer">
-        <div className="wrap">
-          <ul>
-            {content.footer.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      </footer>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replaceAll("<", "\\u003c") }}
       />
-    </>
+    </PublicFrame>
   );
 }

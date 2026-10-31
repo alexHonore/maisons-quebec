@@ -5,6 +5,7 @@ import {
   readRegulatoryIdentity,
   regulatoryFields,
   regulatoryStatusLabel,
+  resolveRegulatoryIdentity,
 } from "./regulatory-identity";
 
 describe("identité réglementaire", () => {
@@ -35,5 +36,15 @@ describe("identité réglementaire", () => {
     assert.equal(fields[2]?.state, "empty");
     assert.equal(regulatoryStatusLabel(identity), "Identification professionnelle partielle");
     assert.match(regulatoryStatusLabel({ ...identity, agencyPermit: "X" }), /validation humaine/);
+  });
+
+  it("fait primer la valeur enregistrée et ignore le libellé vide", () => {
+    const resolved = resolveRegulatoryIdentity(
+      { brokerPermit: REGULATORY_EMPTY_LABEL, agencyName: "Cabinet saisi", agencyPermit: "" },
+      { BROKER_OACIQ_PERMIT: "DEPUIS-ENV", AGENCY_NAME: "Depuis env", AGENCY_PERMIT: "" },
+    );
+    assert.equal(resolved.brokerPermit, "DEPUIS-ENV");
+    assert.equal(resolved.agencyName, "Cabinet saisi");
+    assert.equal(resolved.agencyPermit, null);
   });
 });

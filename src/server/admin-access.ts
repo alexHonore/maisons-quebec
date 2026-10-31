@@ -1,8 +1,8 @@
 /**
- * Garde d'administration provisoire.
+ * Garde d'administration.
  * Sans `ADMIN_SESSION_SECRET`, aucune session n'est acceptée.
- * Une session signée ne prouve pas un second facteur, ni un contrôle de rôle :
- * ces trous restent explicites dans `gaps`. Aucune route de connexion n'existe.
+ * `mfa` n'est vrai dans le jeton que si l'émetteur l'a signé après un TOTP valide.
+ * Les rôles ne sont pas appliqués : ce trou reste dans `gaps`.
  */
 
 export const ADMIN_COOKIE_NAME = "mq_admin_session";
@@ -39,7 +39,7 @@ export type AdminSession = {
   readonly subject: string;
   readonly role: AdminRole;
   readonly expiresAt: string;
-  readonly mfaSatisfied: false;
+  readonly mfaSatisfied: boolean;
 };
 
 export type AccessDenialReason =
@@ -58,7 +58,7 @@ export type AccessDecision =
       readonly allowed: true;
       readonly httpStatus: 200;
       readonly session: AdminSession;
-      readonly gaps: readonly ["mfa_not_enforced", "rbac_not_enforced", "no_persistent_user_store"];
+      readonly gaps: readonly AdminGap[];
     };
 
 const SUBJECT = /^[\p{L}\p{N} ._@+-]{1,80}$/u;
@@ -68,7 +68,10 @@ type SessionPayload = {
   sub: string;
   role: AdminRole;
   exp: number;
+  mfa: boolean;
 };
+
+const PAYLOAD_KEYS = ["v", "sub", "role", "exp", "mfa"] as const;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -120,13 +123,22 @@ function readPayload(encoded: string): SessionPayload | null {
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
   const keys = Object.keys(parsed);
-  if (keys.length !== 4 || !keys.every((key) => ["v", "sub", "role", "exp"].includes(key))) return null;
+  if (keys.length !== PAYLOAD_KEYS.length || !keys.every((key) => (PAYLOAD_KEYS as readonly string[]).includes(key))) {
+    return null;
+  }
   const record = parsed as Record<string, unknown>;
   if (record.v !== ADMIN_SESSION_VERSION) return null;
   if (typeof record.sub !== "string" || !SUBJECT.test(record.sub)) return null;
   if (!isAdminRole(record.role)) return null;
   if (!Number.isSafeInteger(record.exp)) return null;
-  return { v: ADMIN_SESSION_VERSION, sub: record.sub, role: record.role, exp: record.exp as number };
+  if (typeof record.mfa !== "boolean") return null;
+  return {
+    v: ADMIN_SESSION_VERSION,
+    sub: record.sub,
+    role: record.role,
+    exp: record.exp as number,
+    mfa: record.mfa,
+  };
 }
 
 export async function issueAdminSessionCookie(input: {
@@ -134,6 +146,7 @@ export async function issueAdminSessionCookie(input: {
   subject: string;
   role: AdminRole;
   expiresAt: Date;
+  mfaSatisfied?: boolean;
 }): Promise<string> {
   if (input.secret.trim() === "") {
     throw new Error("ADMIN_SESSION_SECRET est vide.");
@@ -146,6 +159,7 @@ export async function issueAdminSessionCookie(input: {
     sub: input.subject,
     role: input.role,
     exp: input.expiresAt.getTime(),
+    mfa: input.mfaSatisfied === true,
   };
   const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const key = await hmacKey(input.secret);
@@ -193,17 +207,38 @@ export async function authorizeAdminRequest(input: {
       subject: payload.sub,
       role: payload.role,
       expiresAt: new Date(payload.exp).toISOString(),
-      mfaSatisfied: false,
+      mfaSatisfied: payload.mfa,
     },
-    gaps: ["mfa_not_enforced", "rbac_not_enforced", "no_persistent_user_store"],
+    gaps: payload.mfa
+      ? ["rbac_not_enforced", "no_persistent_user_store"]
+      : ["mfa_not_enforced", "rbac_not_enforced", "no_persistent_user_store"],
   };
+}
+
+export function serializeAdminCookie(value: string, options: { maxAgeSeconds: number; secure: boolean }): string {
+  const parts = [
+    `${ADMIN_COOKIE_NAME}=${value}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    `Max-Age=${options.maxAgeSeconds}`,
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function clearAdminCookie(secure: boolean): string {
+  const parts = [`${ADMIN_COOKIE_NAME}=`, "HttpOnly", "SameSite=Lax", "Path=/", "Max-Age=0"];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
 }
 
 export const ADMIN_REFUSAL_COPY = {
   title: "Authentification requise",
   lead: "Cette zone d'administration refuse la demande : aucune session valide n'est présentée.",
-  mfa: "L'authentification multifacteur des comptes privilégiés n'est pas en place. Aucun fournisseur n'a été choisi. Ce n'est pas une protection active.",
-  scope: "Le portail n'est pas livré : ni leads, ni contenus, ni webhooks, ni réglages.",
+  mfa: "Le second facteur TOTP n'est évalué qu'à la connexion, et seulement s'il est configuré. S'il est vide, il ne protège pas cette zone.",
+  scope: "Les réglages ne s'affichent pas sans session. Les leads et les webhooks ne sont pas livrés.",
+  login: "Ouvrir la page de connexion",
   back: "Retour à l'accueil",
 } as const;
 
@@ -231,6 +266,7 @@ export function renderAdminRefusalDocument(): string {
     <p>${copy.lead}</p>
     <p>${copy.mfa}</p>
     <p>${copy.scope}</p>
+    <p><a href="/admin/login">${copy.login}</a></p>
     <p><a href="/">${copy.back}</a></p>
   </main>
 </body>

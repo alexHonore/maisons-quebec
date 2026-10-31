@@ -1,5 +1,6 @@
 import { FORMULA_STATEMENT } from "../domain/sale-proceeds";
 import {
+  REGULATORY_EMPTY_LABEL,
   regulatoryFields,
   regulatoryStatusLabel,
   type RegulatoryField,
@@ -55,29 +56,48 @@ export type HomeContent = {
   readonly footer: readonly string[];
 };
 
-export function buildHomeContent(identity: RegulatoryIdentity): HomeContent {
+export type PublicCopy = {
+  readonly brandName?: string;
+  readonly heroTitle?: string;
+  readonly heroPromise?: string;
+  readonly heroSubpromise?: string;
+};
+
+const DEFAULT_BRAND = "Maisons Québec";
+const DEFAULT_HERO_TITLE = "Votre prochaine décision immobilière commence avec de vraies informations.";
+const DEFAULT_HERO_PROMISE =
+  "Maisons Québec prépare un média et des outils pour les personnes qui vendent ou achètent une propriété, d'abord à Québec et à Lévis. La promesse : des informations vérifiables, des calculs dont les hypothèses restent visibles, et un accompagnement humain seulement si vous le demandez.";
+const DEFAULT_HERO_SUBPROMISE =
+  "Outils gratuits, analyses locales transparentes, conseils concrets. Rien de cela n'est simulé ici avec de faux chiffres.";
+
+function publishedCopy(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed === "" || trimmed === REGULATORY_EMPTY_LABEL) return fallback;
+  return trimmed;
+}
+
+export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy = {}): HomeContent {
   return {
-    brand: "Maisons Québec",
+    brand: publishedCopy(copy.brandName, DEFAULT_BRAND),
     brandNote: "Marque provisoire",
     identityStatus: regulatoryStatusLabel(identity),
     nav: [
-      { href: "#vendre", label: "Vendre" },
-      { href: "#acheter", label: "Acheter" },
-      { href: "#marche", label: "Marché et quartiers" },
-      { href: "#outils", label: "Outils gratuits" },
-      { href: "#guides", label: "Guides" },
-      { href: "#contact", label: "Parler à un expert" },
+      { href: "/vendre", label: "Vendre" },
+      { href: "/acheter", label: "Acheter" },
+      { href: "/marche", label: "Marché et quartiers" },
+      { href: "/outils", label: "Outils gratuits" },
+      { href: "/guides", label: "Guides" },
+      { href: "/methodologie", label: "Méthode" },
+      { href: "/contact", label: "Parler à un expert" },
     ],
     hero: {
-      title: "Votre prochaine décision immobilière commence avec de vraies informations.",
-      promise:
-        "Maisons Québec prépare un média et des outils pour les personnes qui vendent ou achètent une propriété, d'abord à Québec et à Lévis. La promesse : des informations vérifiables, des calculs dont les hypothèses restent visibles, et un accompagnement humain seulement si vous le demandez.",
-      subpromise:
-        "Outils gratuits, analyses locales transparentes, conseils concrets. Rien de cela n'est simulé ici avec de faux chiffres.",
+      title: publishedCopy(copy.heroTitle, DEFAULT_HERO_TITLE),
+      promise: publishedCopy(copy.heroPromise, DEFAULT_HERO_PROMISE),
+      subpromise: publishedCopy(copy.heroSubpromise, DEFAULT_HERO_SUBPROMISE),
       actions: [
-        { href: "#vendre", label: "Je veux vendre", description: "Estimation et produit net, sans prix inventé." },
-        { href: "#acheter", label: "Je veux acheter", description: "Coûts et quartiers, seulement lorsque les sources existent." },
-        { href: "#marche", label: "Explorer mon marché", description: "Québec et Lévis, sans statistique tant qu'aucune source n'est branchée." },
+        { href: "/vendre", label: "Je veux vendre", description: "Estimation et produit net, sans prix inventé." },
+        { href: "/acheter", label: "Je veux acheter", description: "Coûts et quartiers, seulement lorsque les sources existent." },
+        { href: "/marche", label: "Explorer mon marché", description: "Québec et Lévis, sans statistique tant qu'aucune source n'est branchée." },
       ],
     },
     limits: [
@@ -112,11 +132,11 @@ export function buildHomeContent(identity: RegulatoryIdentity): HomeContent {
       title: "Marché de Québec et de Lévis",
       body: "Le premier territoire visé est la ville de Québec, Lévis et les environs : Sainte-Foy–Sillery–Cap-Rouge, Charlesbourg, Beauport, Limoilou, Saint-Roch, Val-Bélair, Ancienne-Lorette, Saint-Augustin, Saint-Nicolas et Desjardins. Le reste du Québec attend des contenus vérifiables et une capacité réelle de prise en charge. Aucun chiffre de marché n'est publié.",
       places: [
-        { name: "Limoilou, Québec", status: "Page non publiée — aucun contenu local vérifié" },
-        { name: "Charlesbourg, Québec", status: "Page non publiée — aucun contenu local vérifié" },
-        { name: "Beauport, Québec", status: "Page non publiée — aucun contenu local vérifié" },
-        { name: "Sainte-Foy, Québec", status: "Page non publiée — aucun contenu local vérifié" },
-        { name: "Saint-Nicolas, Lévis", status: "Page non publiée — aucun contenu local vérifié" },
+        { name: "Limoilou, Québec", status: REGULATORY_EMPTY_LABEL },
+        { name: "Charlesbourg, Québec", status: REGULATORY_EMPTY_LABEL },
+        { name: "Beauport, Québec", status: REGULATORY_EMPTY_LABEL },
+        { name: "Sainte-Foy, Québec", status: REGULATORY_EMPTY_LABEL },
+        { name: "Saint-Nicolas, Lévis", status: REGULATORY_EMPTY_LABEL },
       ],
     },
     questions: {

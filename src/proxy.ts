@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authorizeAdminRequest, ADMIN_COOKIE_NAME, renderAdminRefusalDocument } from "@/server/admin-access";
+import { adminPathRequiresSession } from "@/server/admin-gate";
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname.replace(/\/$/, "") || "/";
+  if (!adminPathRequiresSession(pathname)) {
+    return NextResponse.next();
+  }
+
   const decision = await authorizeAdminRequest({
     secret: process.env.ADMIN_SESSION_SECRET,
     cookieValue: request.cookies.get(ADMIN_COOKIE_NAME)?.value,

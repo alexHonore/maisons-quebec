@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { PILLAR_PAGES } from "@/content/pillars";
 import { readSiteUrl } from "@/domain/site-url";
 
 const CONTENT_DATE = "2026-10-31";
@@ -12,5 +13,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 1,
     },
+    ...PILLAR_PAGES.map((page) => ({
+      url: new URL(page.path, site.origin).href,
+      lastModified: CONTENT_DATE,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
   ];
 }

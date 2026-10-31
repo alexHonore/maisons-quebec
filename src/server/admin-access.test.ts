@@ -7,6 +7,7 @@ import {
   authorizeAdminRequest,
   issueAdminSessionCookie,
   renderAdminRefusalDocument,
+  serializeAdminCookie,
 } from "./admin-access";
 
 const secret = "test-secret-not-a-real-credential";
@@ -82,7 +83,22 @@ describe("authorizeAdminRequest", () => {
     assert.equal(longDecision.allowed, false);
   });
 
-  it("refuse un champ inconnu, donc un drapeau MFA ajouté au jeton", async () => {
+  it("reconnaît un TOTP seulement s'il est dans le jeton signé", async () => {
+    const value = await issueAdminSessionCookie({
+      secret,
+      subject: "fondateur",
+      role: "owner",
+      expiresAt: new Date(now.getTime() + 60_000),
+      mfaSatisfied: true,
+    });
+    const decision = await authorizeAdminRequest({ secret, cookieValue: value, now });
+    assert.equal(decision.allowed, true);
+    if (!decision.allowed) return;
+    assert.equal(decision.session.mfaSatisfied, true);
+    assert.equal(decision.gaps.includes("mfa_not_enforced"), false);
+  });
+
+  it("refuse un champ inconnu ajouté au jeton", async () => {
     const payload = Buffer.from(
       JSON.stringify({
         v: 1,
@@ -90,6 +106,7 @@ describe("authorizeAdminRequest", () => {
         role: "owner",
         exp: now.getTime() + 60_000,
         mfa: true,
+        elevated: true,
       }),
     ).toString("base64url");
     const signature = createHmac("sha256", secret).update(payload).digest("base64url");
@@ -116,13 +133,27 @@ describe("authorizeAdminRequest", () => {
 });
 
 describe("document de refus", () => {
-  it("explique le trou MFA sans indiquer comment établir une session", () => {
+  it("explique le trou MFA sans dire comment forger une session", () => {
     const html = renderAdminRefusalDocument();
     assert.match(html, new RegExp(ADMIN_REFUSAL_COPY.title));
     assert.match(html, /noindex/);
     assert.match(html, /lang="fr-CA"/);
+    assert.match(html, /href="\/admin\/login"/);
     assert.equal(html.includes(ADMIN_COOKIE_NAME), false);
     assert.equal(html.includes("ADMIN_SESSION_SECRET"), false);
     assert.equal(html.toLowerCase().includes("cookie"), false);
+    assert.equal(html.toLowerCase().includes("connecté"), false);
+  });
+});
+
+describe("cookie admin", () => {
+  it("pose HttpOnly et n'ajoute Secure que si demandé", () => {
+    const local = serializeAdminCookie("jeton", { maxAgeSeconds: 60, secure: false });
+    assert.match(local, /^mq_admin_session=jeton;/);
+    assert.match(local, /HttpOnly/);
+    assert.match(local, /SameSite=Lax/);
+    assert.equal(local.includes("Secure"), false);
+    const hosted = serializeAdminCookie("jeton", { maxAgeSeconds: 60, secure: true });
+    assert.match(hosted, /Secure/);
   });
 });

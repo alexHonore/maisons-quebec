@@ -42,6 +42,24 @@ export function regulatoryFields(identity: RegulatoryIdentity): readonly Regulat
   }));
 }
 
+/** La valeur enregistrée prime. Une valeur vide retombe sur l'environnement, jamais sur un permis inventé. */
+export function resolveRegulatoryIdentity(
+  stored: Pick<RegulatoryIdentity, "brokerPermit" | "agencyName" | "agencyPermit">,
+  env: { readonly [key: string]: string | undefined },
+): RegulatoryIdentity {
+  const fromEnv = readRegulatoryIdentity(env);
+  const pick = (storedValue: string | null, envValue: string | null): string | null => {
+    const trimmed = storedValue?.trim() ?? "";
+    if (trimmed !== "" && trimmed !== REGULATORY_EMPTY_LABEL) return trimmed;
+    return envValue;
+  };
+  return {
+    brokerPermit: pick(stored.brokerPermit, fromEnv.brokerPermit),
+    agencyName: pick(stored.agencyName, fromEnv.agencyName),
+    agencyPermit: pick(stored.agencyPermit, fromEnv.agencyPermit),
+  };
+}
+
 export function regulatoryStatusLabel(identity: RegulatoryIdentity): string {
   const filled = [identity.brokerPermit, identity.agencyName, identity.agencyPermit].filter(
     (value) => value !== null,

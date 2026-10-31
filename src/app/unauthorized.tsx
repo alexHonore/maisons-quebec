@@ -9,6 +9,9 @@ export default function Unauthorized() {
       <p>{ADMIN_REFUSAL_COPY.mfa}</p>
       <p>{ADMIN_REFUSAL_COPY.scope}</p>
       <p>
+        <Link href="/admin/login">{ADMIN_REFUSAL_COPY.login}</Link>
+      </p>
+      <p>
         <Link href="/">{ADMIN_REFUSAL_COPY.back}</Link>
       </p>
     </main>
