@@ -113,7 +113,42 @@ export function saveContentDraft(
     subjectId: id,
     at: input.now,
   });
+  if (existing && String(existing.status) === "published") {
+    appendContentVersion(db, id, input.actorId, now, null);
+  }
   return { ok: true, id };
+}
+
+function appendContentVersion(
+  db: DatabaseSync,
+  pageId: string,
+  actorId: string,
+  at: string,
+  restoredFrom: number | null,
+): number {
+  const page = db.prepare(`${ROW_SQL} WHERE id = ?`).get(pageId);
+  if (!page) throw new Error("Page introuvable pour la version.");
+  const current = db.prepare("SELECT COALESCE(MAX(version_number), 0) AS total FROM content_versions WHERE page_id = ?").get(pageId);
+  const versionNumber = Number(current?.total ?? 0) + 1;
+  db.prepare(
+    `INSERT INTO content_versions (
+       id, page_id, version_number, slug, title, description, body, source_note, example, created_at, created_by, restored_from
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    randomUUID(),
+    pageId,
+    versionNumber,
+    String(page.slug),
+    String(page.title),
+    String(page.description),
+    String(page.body),
+    String(page.source_note),
+    Number(page.example),
+    at,
+    actorId,
+    restoredFrom,
+  );
+  return versionNumber;
 }
 
 export function setContentPublished(
@@ -126,6 +161,7 @@ export function setContentPublished(
   const now = input.now.toISOString();
   if (input.published) {
     db.prepare("UPDATE content_pages SET status = 'published', published_at = ?, updated_at = ? WHERE id = ?").run(now, now, input.id);
+    appendContentVersion(db, input.id, input.actorId, now, null);
   } else {
     db.prepare("UPDATE content_pages SET status = 'draft', updated_at = ? WHERE id = ?").run(now, input.id);
   }
@@ -137,6 +173,73 @@ export function setContentPublished(
     at: input.now,
   });
   return { ok: true };
+}
+
+export type ContentVersion = {
+  readonly id: string;
+  readonly versionNumber: number;
+  readonly title: string;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly restoredFrom: number | null;
+};
+
+export function listContentVersions(db: DatabaseSync, pageId: string): ContentVersion[] {
+  return db
+    .prepare(
+      `SELECT id, version_number, title, body, created_at, restored_from
+       FROM content_versions WHERE page_id = ? ORDER BY version_number ASC`,
+    )
+    .all(pageId)
+    .map((row) => ({
+      id: String(row.id),
+      versionNumber: Number(row.version_number),
+      title: String(row.title),
+      body: String(row.body),
+      createdAt: String(row.created_at),
+      restoredFrom: row.restored_from === null || row.restored_from === undefined ? null : Number(row.restored_from),
+    }));
+}
+
+export function restoreContentVersion(
+  db: DatabaseSync,
+  input: { actorId: string; actorRole: AdminRole; pageId: string; versionNumber: number; now: Date },
+): { ok: true; versionNumber: number } | { ok: false; reason: "forbidden" | "missing" | "duplicate_slug" } {
+  if (!roleCan(input.actorRole, "content.publish")) return { ok: false, reason: "forbidden" };
+  const version = db
+    .prepare(
+      `SELECT version_number, slug, title, description, body, source_note, example
+       FROM content_versions WHERE page_id = ? AND version_number = ?`,
+    )
+    .get(input.pageId, input.versionNumber);
+  const page = db.prepare("SELECT id FROM content_pages WHERE id = ?").get(input.pageId);
+  if (!version || !page) return { ok: false, reason: "missing" };
+  const slugOwner = db.prepare("SELECT id FROM content_pages WHERE slug = ? AND id <> ?").get(String(version.slug), input.pageId);
+  if (slugOwner) return { ok: false, reason: "duplicate_slug" };
+  const now = input.now.toISOString();
+  db.prepare(
+    `UPDATE content_pages
+     SET slug = ?, title = ?, description = ?, body = ?, source_note = ?, example = ?, updated_at = ?
+     WHERE id = ?`,
+  ).run(
+    String(version.slug),
+    String(version.title),
+    String(version.description),
+    String(version.body),
+    String(version.source_note),
+    Number(version.example),
+    now,
+    input.pageId,
+  );
+  const created = appendContentVersion(db, input.pageId, input.actorId, now, Number(version.version_number));
+  recordAdminAudit(db, {
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    action: "content.version_restored",
+    subjectId: input.pageId,
+    at: input.now,
+  });
+  return { ok: true, versionNumber: created };
 }
 
 export function readContentForPreview(

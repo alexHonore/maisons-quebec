@@ -1,7 +1,7 @@
 "use server";
 
 import { forbidden, redirect, unauthorized } from "next/navigation";
-import { saveContentDraft, setContentPublished } from "@/server/content-pages";
+import { restoreContentVersion, saveContentDraft, setContentPublished } from "@/server/content-pages";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
 import { settingsDatabase } from "@/server/public-site";
@@ -43,6 +43,22 @@ export async function setContentPublishedAction(formData: FormData) {
     actorRole: live.user.role,
     id,
     published: formData.get("published") === "1",
+    now: new Date(),
+  });
+  redirect(result.ok ? `/admin/contenu/${id}?enregistre=1` : `/admin/contenu/${id}?erreur=${result.reason}`);
+}
+
+export async function restoreContentVersionAction(formData: FormData) {
+  const live = await readLiveAdmin();
+  if (!live.ok) unauthorized();
+  if (!roleCan(live.user.role, "content.publish")) forbidden();
+  const id = String(formData.get("id") ?? "");
+  const versionNumber = Number(formData.get("version_number") ?? "");
+  const result = restoreContentVersion(settingsDatabase(process.env), {
+    actorId: live.user.id,
+    actorRole: live.user.role,
+    pageId: id,
+    versionNumber,
     now: new Date(),
   });
   redirect(result.ok ? `/admin/contenu/${id}?enregistre=1` : `/admin/contenu/${id}?erreur=${result.reason}`);

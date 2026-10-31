@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { REGULATORY_EMPTY_LABEL } from "./regulatory-identity";
 import {
   CONTENT_INDEX_RULE,
   MIN_INDEXABLE_BODY_LENGTH,
@@ -40,19 +39,54 @@ describe("pages de contenu", () => {
     assert.equal(thin.robots, "noindex, nofollow");
     assert.equal(thin.reason, "thin");
 
-    const missingSource = assessContentPage({ ...fields, status: "published", sourceNote: REGULATORY_EMPTY_LABEL });
-    assert.equal(missingSource.indexable, false);
-    assert.equal(missingSource.reason, "source_missing");
-
     const example = assessContentPage({ ...fields, status: "published", example: true });
     assert.equal(example.visible, true);
     assert.equal(example.indexable, false);
     assert.equal(example.reason, "example");
 
-    const figure = assessContentPage({ ...fields, status: "published", body: longBody("Un montant de 450000 est écrit ici.") });
-    assert.equal(figure.visible, true);
-    assert.equal(figure.indexable, false);
-    assert.equal(figure.reason, "unverified_figure");
+    const dated = assessContentPage({
+      ...fields,
+      status: "published",
+      sourceNote: "",
+      body: longBody(" La note date de 2024. Le repère civique est le 12 rue Principale. La longueur se décrit en caractères."),
+    });
+    assert.equal(dated.indexable, true);
+    assert.equal(dated.reason, "indexable");
+
+    const price = assessContentPage({
+      ...fields,
+      status: "published",
+      sourceNote: "",
+      body: longBody(" Le prix cité pour la règle est de 450 000 $."),
+    });
+    assert.equal(price.visible, true);
+    assert.equal(price.indexable, false);
+    assert.equal(price.robots, "noindex, nofollow");
+    assert.equal(price.reason, "unsourced_market_claim");
+
+    const percent = assessContentPage({
+      ...fields,
+      status: "published",
+      sourceNote: "",
+      body: longBody(" Le taux indiqué est de 5 %."),
+    });
+    assert.equal(percent.reason, "unsourced_market_claim");
+
+    const sales = assessContentPage({
+      ...fields,
+      status: "published",
+      sourceNote: "",
+      body: longBody(" On avance 1200 ventes sans dire d'où vient le décompte."),
+    });
+    assert.equal(sales.reason, "unsourced_market_claim");
+
+    const sourcedPrice = assessContentPage({
+      ...fields,
+      status: "published",
+      sourceNote: "Source nommée par l'auteur de la page.",
+      body: longBody(" Le prix cité pour la règle est de 450 000 $."),
+    });
+    assert.equal(sourcedPrice.indexable, true);
 
     const enough = assessContentPage({ ...fields, status: "published" });
     assert.equal(enough.visible, true);

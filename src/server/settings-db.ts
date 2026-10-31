@@ -227,6 +227,27 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS content_pages;",
   },
+  {
+    version: "011_content_versions",
+    up: `
+      CREATE TABLE content_versions (
+        id TEXT PRIMARY KEY,
+        page_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        slug TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        body TEXT NOT NULL,
+        source_note TEXT NOT NULL,
+        example INTEGER NOT NULL CHECK (example IN (0, 1)),
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        restored_from INTEGER,
+        UNIQUE (page_id, version_number)
+      );
+    `,
+    down: "DROP TABLE IF EXISTS content_versions;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

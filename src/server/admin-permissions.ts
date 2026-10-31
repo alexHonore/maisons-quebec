@@ -17,6 +17,7 @@ export const ADMIN_PERMISSIONS = {
   "content.write": ["owner", "editor"],
   "content.preview": ["owner", "editor"],
   "content.publish": ["owner"],
+  "prompts.read": ["owner", "editor"],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

@@ -153,7 +153,7 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
     path: "/guides",
     title: "Guides",
     description: "Les pages de guide viennent de l'administration. Un brouillon reste privé.",
-    lead: "Une page de guide apparaît ici seulement après publication. Un brouillon n'est pas public. Une page trop courte, sans source, marquée comme exemple, ou porteuse d'un chiffre non vérifié n'est pas indexée.",
+    lead: "Une page de guide apparaît ici seulement après publication. Un brouillon n'est pas public. Une page trop courte ou marquée comme exemple n'est pas indexée. Un prix, un taux ou un décompte sans source nommée ne l'est pas non plus.",
     sections: [
       {
         heading: "Règle avant publication",

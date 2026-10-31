@@ -1,20 +1,18 @@
 import { REGULATORY_EMPTY_LABEL } from "./regulatory-identity";
 
 /**
- * Lecture opérationnelle du cahier pour cette tranche :
- * une sous-page non publiée, ou publiée mais trop mince, sans source,
- * marquée comme exemple, ou porteuse d'un chiffre non vérifié, reste noindex.
- * Une page publiée, assez longue, avec une source nommée et sans chiffre non vérifié peut être indexée.
- * Le seuil de longueur n'est pas une statistique de marché.
+ * Une année, une longueur de texte ou un numéro civique ne bloque pas l'indexation.
+ * Un prix, un pourcentage, un taux ou un décompte de marché sans source nommée force noindex.
+ * Brouillon, texte trop court et exemple restent non indexés.
  */
 export const CONTENT_INDEX_RULE =
-  "Une page est indexable seulement si elle est publiée, si son texte atteint le seuil de substance, si une source est nommée, si elle n'est pas marquée comme exemple, et si le titre, la description et le texte ne contiennent ni dollar, ni pourcentage, ni nombre de trois chiffres ou plus. Sinon elle est noindex. Un brouillon n'est pas public.";
+  "Une page est indexable si elle est publiée, si son texte atteint le seuil de substance et si elle n'est pas un exemple. Une année, une longueur de texte ou un numéro civique ne suffit pas à la bloquer. Un prix, un pourcentage, un taux ou un décompte de marché sans source nommée force noindex. Un brouillon n'est pas public.";
 
 export const MIN_INDEXABLE_BODY_LENGTH = 600;
 
 export type ContentStatus = "draft" | "published";
 
-export type ContentIndexReason = "draft" | "example" | "thin" | "source_missing" | "unverified_figure" | "indexable";
+export type ContentIndexReason = "draft" | "example" | "thin" | "unsourced_market_claim" | "indexable";
 
 export type ContentDraftInput = {
   readonly slug: string;
@@ -55,8 +53,33 @@ export function parseContentDraft(input: {
   return { ok: true, value: { slug, title, description, body, sourceNote, example: input.example } };
 }
 
-export function containsUnverifiedFigure(value: string): boolean {
-  return /\$|%|\d{3,}/.test(value);
+export function hasNamedSource(sourceNote: string): boolean {
+  const source = sourceNote.trim();
+  return source.length >= 2 && source !== REGULATORY_EMPTY_LABEL;
+}
+
+/** Prix, pourcentage, taux ou décompte de marché. Une année, une longueur ou un numéro civique ne comptent pas. */
+export function textHasMarketClaim(value: string): boolean {
+  if (/\$/.test(value)) return true;
+  if (/\d[\d\s\u00a0.,]*\s*(?:dollars?|CAD)\b/i.test(value)) return true;
+  if (/\bprix\b[^.\n]{0,80}\d|\d[^.\n]{0,40}\bprix\b/i.test(value)) return true;
+  if (/%/.test(value)) return true;
+  if (/\d[^.\n]{0,30}\bpour\s+cent\b/i.test(value)) return true;
+  if (/\btaux\b[^.\n]{0,40}\d/i.test(value)) return true;
+  if (/\d[\d\s\u00a0.,]*\s*(?:ventes?|transactions?|inscriptions?|mises en marché|maisons vendues|propriétés vendues)\b/i.test(value)) {
+    return true;
+  }
+  return false;
+}
+
+export function hasUnsourcedMarketClaim(page: {
+  readonly title: string;
+  readonly description: string;
+  readonly body: string;
+  readonly sourceNote: string;
+}): boolean {
+  if (hasNamedSource(page.sourceNote)) return false;
+  return textHasMarketClaim(`${page.title}\n${page.description}\n${page.body}`);
 }
 
 export function assessContentPage(page: {
@@ -88,11 +111,7 @@ function indexReason(page: {
   if (page.status !== "published") return "draft";
   if (page.example) return "example";
   if (page.body.trim().length < MIN_INDEXABLE_BODY_LENGTH) return "thin";
-  const source = page.sourceNote.trim();
-  if (source.length < 12 || source === REGULATORY_EMPTY_LABEL) return "source_missing";
-  if (containsUnverifiedFigure(page.title) || containsUnverifiedFigure(page.description) || containsUnverifiedFigure(page.body)) {
-    return "unverified_figure";
-  }
+  if (hasUnsourcedMarketClaim(page)) return "unsourced_market_claim";
   return "indexable";
 }
 
@@ -104,10 +123,8 @@ export function indexReasonLabel(reason: ContentIndexReason): string {
       return "exemple, non indexé";
     case "thin":
       return "texte trop court, non indexé";
-    case "source_missing":
-      return "source absente, non indexé";
-    case "unverified_figure":
-      return "chiffre non vérifié, non indexé";
+    case "unsourced_market_claim":
+      return "prix, taux ou décompte sans source, non indexé";
     case "indexable":
       return "publiée et indexable";
   }

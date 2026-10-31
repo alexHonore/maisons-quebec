@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, unauthorized } from "next/navigation";
-import { saveContentDraftAction, setContentPublishedAction } from "@/app/admin/contenu/actions";
+import { restoreContentVersionAction, saveContentDraftAction, setContentPublishedAction } from "@/app/admin/contenu/actions";
 import { ContentArticle } from "@/components/content-article";
-import { readContentForPreview } from "@/server/content-pages";
+import { listContentVersions, readContentForPreview } from "@/server/content-pages";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
 import { loadPublicSite, settingsDatabase } from "@/server/public-site";
@@ -36,7 +36,8 @@ export default async function ContentPreviewPage({
   if (!roleCan(live.user.role, "content.preview")) forbidden();
   const { id } = await params;
   const query = await searchParams;
-  const preview = readContentForPreview(settingsDatabase(process.env), { actorRole: live.user.role, id });
+  const db = settingsDatabase(process.env);
+  const preview = readContentForPreview(db, { actorRole: live.user.role, id });
   if (!preview.ok) {
     if (preview.reason === "forbidden") forbidden();
     return (
@@ -49,6 +50,7 @@ export default async function ContentPreviewPage({
     );
   }
   const { page } = preview;
+  const versions = listContentVersions(db, page.id);
   const { content } = loadPublicSite(process.env);
   const canWrite = roleCan(live.user.role, "content.write") && (page.status === "draft" || roleCan(live.user.role, "content.publish"));
 
@@ -101,6 +103,27 @@ export default async function ContentPreviewPage({
               </button>
             </form>
           ) : null}
+          <h2>Versions</h2>
+          {versions.length === 0 ? <p>Aucune version. La publication en crée une.</p> : null}
+          <ul className="plain-list">
+            {versions.map((version) => (
+              <li key={version.id}>
+                <p>
+                  Version {version.versionNumber} — {version.createdAt}
+                  {version.restoredFrom === null ? "" : ` — reprise de la version ${version.restoredFrom}`}
+                </p>
+                {roleCan(live.user.role, "content.publish") ? (
+                  <form action={restoreContentVersionAction}>
+                    <input type="hidden" name="id" value={page.id} />
+                    <input type="hidden" name="version_number" value={String(version.versionNumber)} />
+                    <button className="button" type="submit">
+                      Restaurer cette version
+                    </button>
+                  </form>
+                ) : null}
+              </li>
+            ))}
+          </ul>
           {page.assessment.visible ? (
             <p>
               <Link href={`/guides/${page.slug}`}>Voir la page publique</Link>

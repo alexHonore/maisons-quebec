@@ -21,6 +21,7 @@ export const AUDIT_ACTIONS = [
   "content.saved",
   "content.published",
   "content.unpublished",
+  "content.version_restored",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

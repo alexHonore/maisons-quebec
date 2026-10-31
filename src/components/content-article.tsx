@@ -1,4 +1,4 @@
-import { containsUnverifiedFigure, indexReasonLabel, type ContentAssessment } from "@/domain/content-page";
+import { indexReasonLabel, type ContentAssessment } from "@/domain/content-page";
 
 export function ContentArticle({
   page,
@@ -22,10 +22,10 @@ export function ContentArticle({
         </p>
       ) : null}
       {page.example ? <p>Exemple de rédaction. Ce texte n&apos;est pas un fait de marché.</p> : null}
-      {containsUnverifiedFigure(`${page.title}\n${page.description}\n${page.body}`) ? (
-        <p>Ce passage contient un chiffre. Il n&apos;est pas une donnée de marché vérifiée.</p>
+      {page.assessment.reason === "unsourced_market_claim" ? (
+        <p>Ce texte cite un prix, un taux ou un décompte sans source nommée. Il n&apos;est pas une donnée de marché vérifiée.</p>
       ) : (
-        <p>Cette page n&apos;affiche pas de statistique de marché.</p>
+        <p>Cette page n&apos;est pas une statistique de marché publiée par le site.</p>
       )}
       <h1>{page.title}</h1>
       <p className="lede">{page.description}</p>
