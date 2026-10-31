@@ -158,6 +158,41 @@ export const MIGRATIONS = [
       DROP TABLE IF EXISTS net_proceeds_drafts;
     `,
   },
+  {
+    version: "008_funnels_appointments",
+    up: `
+      CREATE TABLE funnel_drafts (
+        id TEXT PRIMARY KEY,
+        funnel_name TEXT NOT NULL,
+        answers_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE funnel_answers (
+        id TEXT PRIMARY KEY,
+        lead_id TEXT NOT NULL,
+        funnel_name TEXT NOT NULL,
+        answers_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE appointments (
+        id TEXT PRIMARY KEY,
+        lead_id TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL CHECK (status IN ('requested', 'confirmed')),
+        window_text TEXT NOT NULL,
+        confirmed_slot TEXT,
+        requested_at TEXT NOT NULL,
+        confirmed_at TEXT,
+        confirmed_by TEXT
+      );
+      CREATE UNIQUE INDEX leads_dedup_email_funnel ON leads (contact_email, funnel_name);
+    `,
+    down: `
+      DROP INDEX IF EXISTS leads_dedup_email_funnel;
+      DROP TABLE IF EXISTS appointments;
+      DROP TABLE IF EXISTS funnel_answers;
+      DROP TABLE IF EXISTS funnel_drafts;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

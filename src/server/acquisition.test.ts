@@ -4,14 +4,21 @@ import { describe, it } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { auditPlainText } from "./admin-audit";
 import { ADMIN_ROLES } from "./admin-access";
+import { DEDUP_KEY } from "../domain/honest-funnels";
+import { REGULATORY_EMPTY_LABEL } from "../domain/regulatory-identity";
 import {
+  APPOINTMENT_CONFIRMED,
+  APPOINTMENT_REQUESTED,
   attemptsPlainText,
   captureLead,
+  confirmAppointment,
   deliveryLabel,
   dispatchPendingOutbox,
   leadVisibility,
   listLeadAggregates,
+  listLeadsForOwner,
   listWebhookDestinations,
+  saveFunnelDraft,
   saveNetProceedsDraft,
   saveWebhookDestination,
   signWebhook,
@@ -116,6 +123,197 @@ describe("acquisition", () => {
     const aggregate = listLeadAggregates(db)[0];
     assert.equal(aggregate && "email" in aggregate, false);
     assert.equal(JSON.stringify(aggregate).includes("personne@example.com"), false);
+    db.close();
+  });
+});
+
+const estimationAnswers = {
+  municipality: "Sillery",
+  property_type: "condo",
+  year_band: "recente",
+  surface_band: "moyenne",
+  bedrooms: "deux",
+  condition: "travaux_a_prevoir",
+};
+
+function estimationDraft(db: DatabaseSync): string {
+  return saveFunnelDraft(db, { funnelName: "estimation_maison", answers: estimationAnswers }, now);
+}
+
+describe("dédoublonnage et rendez-vous", () => {
+  it(`utilise la clé ${DEDUP_KEY} et ne fusionne pas deux personnes`, async () => {
+    const db = freshDb();
+    const draftId = estimationDraft(db);
+    const first = captureLead(db, {
+      name: "Alice Martin",
+      email: " Alice@Example.com ",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "fenetre-privee-ne-pas-aggreger",
+    }, now);
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    assert.equal(first.duplicate, false);
+    const second = captureLead(db, {
+      name: "Bob Martin",
+      email: "alice@example.com",
+      consentToRespond: true,
+      consentMarketing: true,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "autre plage",
+    }, now);
+    assert.equal(second.ok && second.duplicate && second.leadId === first.leadId && second.outboxId === null, true);
+    const owner = listLeadsForOwner(db);
+    assert.equal(owner.length, 1);
+    assert.equal(owner[0]?.name, "Alice Martin");
+    assert.equal(owner[0]?.consentMarketing, false);
+    assert.equal(owner[0]?.appointmentStatus, "requested");
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM lead_outbox WHERE event_type = 'lead.created'").get()?.total, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM appointments").get()?.total, 1);
+
+    const otherFunnel = saveFunnelDraft(db, { funnelName: "cout_total_achat", answers: { focus: "les_deux" } }, now);
+    const separate = captureLead(db, {
+      name: "Alice Martin",
+      email: "alice@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId: otherFunnel,
+      funnelName: "cout_total_achat",
+    }, now);
+    assert.equal(separate.ok && separate.duplicate === false, true);
+
+    const sameName = captureLead(db, {
+      name: "Alice Martin",
+      email: "autre-personne@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+    }, now);
+    assert.equal(sameName.ok && sameName.duplicate === false, true);
+    assert.equal(listLeadsForOwner(db).length, 3);
+    const aggregate = JSON.stringify(listLeadAggregates(db));
+    assert.equal(aggregate.includes("fenetre-privee-ne-pas-aggreger"), false);
+    assert.equal(aggregate.includes("alice@example.com"), false);
+    assert.equal(aggregate.includes("autre-personne@example.com"), false);
+
+    const events = db.prepare("SELECT event_type, body FROM lead_outbox").all();
+    assert.equal(events.some((row) => row.event_type === APPOINTMENT_CONFIRMED), false);
+    const requested = events.find((row) => row.event_type === APPOINTMENT_REQUESTED);
+    assert.ok(requested);
+    assert.equal(String(requested?.body).includes("alice@example.com"), false);
+    assert.equal(String(requested?.body).includes("contact_email"), false);
+
+    saveWebhookDestination(db, {
+      actorId: "acteur-1",
+      actorRole: "integration_manager",
+      name: "Récepteur",
+      url: "https://hooks.example.test/leads",
+      secret: "secret-de-destination-test",
+      sessionSecret,
+      now,
+    });
+    const thrown = await dispatchPendingOutbox(db, {
+      now,
+      sessionSecret,
+      transport: async () => {
+        throw new Error("alice@example.com hors service");
+      },
+    });
+    assert.equal(thrown.delivered, 0);
+    assert.equal(thrown.failed > 0, true);
+    assert.equal(listLeadsForOwner(db).length, 3);
+    assert.equal(listLeadAggregates(db).every((row) => row.deliveryStatus === "pending"), true);
+    assert.equal(attemptsPlainText(db).includes("alice@example.com"), false);
+    db.close();
+  });
+
+  it("confirme un créneau seulement si un propriétaire le saisit", () => {
+    const db = freshDb();
+    const draftId = estimationDraft(db);
+    const saved = captureLead(db, {
+      name: "Camille Roy",
+      email: "camille@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "mardi matin",
+    }, now);
+    assert.equal(saved.ok, true);
+    if (!saved.ok) return;
+    assert.equal(captureLead(db, {
+      name: "Camille Roy",
+      email: "camille@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "",
+    }, now).ok, true);
+    const refused = captureLead(db, {
+      name: "Denis Roy",
+      email: "denis@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "",
+    }, now);
+    assert.deepEqual(refused, { ok: false, reason: "appointment_window_required" });
+    assert.equal(confirmAppointment(db, { actorId: "editeur", actorRole: "editor", leadId: saved.leadId, slot: "mardi matin", now }).ok, false);
+    assert.equal(confirmAppointment(db, { actorId: "analyste", actorRole: "analyst", leadId: saved.leadId, slot: "mardi matin", now }).ok, false);
+    assert.deepEqual(
+      confirmAppointment(db, { actorId: "owner-1", actorRole: "owner", leadId: saved.leadId, slot: REGULATORY_EMPTY_LABEL, now }),
+      { ok: false, reason: "invalid_slot" },
+    );
+    const produit = saveNetProceedsDraft(db, input, now);
+    const withoutAppointment = captureLead(db, {
+      name: "Eve Roy",
+      email: "eve@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId: produit,
+    }, now);
+    assert.equal(withoutAppointment.ok, true);
+    if (!withoutAppointment.ok) return;
+    assert.deepEqual(
+      confirmAppointment(db, { actorId: "owner-1", actorRole: "owner", leadId: withoutAppointment.leadId, slot: "mardi matin", now }),
+      { ok: false, reason: "not_requested" },
+    );
+    const confirmed = confirmAppointment(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      leadId: saved.leadId,
+      slot: "  mardi matin au bureau  ",
+      now,
+    });
+    assert.equal(confirmed.ok, true);
+    assert.deepEqual(
+      confirmAppointment(db, { actorId: "owner-1", actorRole: "owner", leadId: saved.leadId, slot: "mercredi matin", now }),
+      { ok: false, reason: "already_confirmed" },
+    );
+    const confirmedEvents = db.prepare("SELECT body FROM lead_outbox WHERE event_type = ?").all(APPOINTMENT_CONFIRMED);
+    assert.equal(confirmedEvents.length, 1);
+    assert.equal(String(confirmedEvents[0]?.body).includes("camille@example.com"), false);
+    assert.equal(String(confirmedEvents[0]?.body).includes("mardi matin au bureau"), true);
+    const full = listLeadsForOwner(db).find((row) => row.id === saved.leadId);
+    assert.equal(full?.appointmentStatus, "confirmed");
+    assert.equal(full?.confirmedSlot, "mardi matin au bureau");
+    const aggregate = listLeadAggregates(db).find((row) => row.id === saved.leadId);
+    assert.equal(aggregate?.appointmentStatus, "confirmed");
+    assert.equal(JSON.stringify(aggregate).includes("mardi matin au bureau"), false);
+    assert.equal(auditPlainText(db).includes("mardi matin au bureau"), false);
+    assert.equal(auditPlainText(db).includes("camille@example.com"), false);
+    assert.match(auditPlainText(db), /appointment.confirmed/);
     db.close();
   });
 });

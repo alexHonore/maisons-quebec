@@ -30,7 +30,7 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       {
         heading: "Estimation préparatoire",
         paragraphs: [
-          "Une estimation utile demanderait des ventes comparables licites, une description du bien et une relecture humaine. Rien de cela n'est disponible ici.",
+          "Une page préparatoire reprend la description du bien et ce qui manque. Aucune vente comparable n'est branchée, donc aucun prix n'est affiché.",
           "Un résultat automatisé ne sera jamais présenté comme une évaluation certifiée ni comme une valeur marchande garantie.",
         ],
       },
@@ -50,10 +50,13 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       `Identité du courtier annonceur : ${missing}`,
     ],
     links: [
+      { href: "/vendre/estimation-maison", label: "Préparer une estimation sans prix" },
       { href: "/vendre/calculateur-produit-net", label: "Calculer un produit net hypothétique" },
+      { href: "/vendre/vendre-avant-acheter", label: "Voir vendre avant d'acheter" },
+      { href: "/vendre/preparer-sa-maison", label: "Cocher la préparation à la vente" },
       { href: "/methodologie", label: "Lire la méthode de calcul" },
       { href: "/acheter", label: "Voir le versant achat" },
-      { href: "/contact", label: "La prise de rendez-vous n'est pas ouverte" },
+      { href: "/contact", label: "Un rendez-vous se demande depuis un outil" },
     ],
   },
   {
@@ -66,14 +69,14 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       {
         heading: "Ce que le calcul devra distinguer",
         paragraphs: [
-          "Plus tard, un outil pourra séparer le prix, la mise de fonds, les frais de notaire, la taxe de bienvenue selon un barème vérifié, les taxes municipales et scolaires si elles sont fournies, et les coûts de possession.",
+          "Une page sépare les frais uniques et les frais récurrents. Elle ne calcule ni le prix, ni la mise de fonds, ni la taxe de bienvenue, ni les taxes, ni une mensualité.",
           "Aucun taux hypothécaire n'est codé ici. Aucune approbation de crédit n'est offerte. Ce n'est pas un conseil financier.",
         ],
       },
       {
         heading: "Quartier",
         paragraphs: [
-          "Le choix d'un quartier devra s'appuyer sur des critères de lieu vérifiables : transport, services, type de milieu. Aucun classement n'est publié.",
+          "Une page note des préférences de lieu : transport, services, type de milieu. Elle ne recommande aucun quartier et ne publie aucun classement.",
         ],
       },
     ],
@@ -83,6 +86,8 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       `Taxes municipales et scolaires : ${missing}`,
     ],
     links: [
+      { href: "/acheter/comparer-quartiers", label: "Noter des préférences de quartier" },
+      { href: "/acheter/cout-total-achat", label: "Séparer les coûts d'achat" },
       { href: "/marche", label: "Voir le marché de Québec et de Lévis" },
       { href: "/vendre", label: "Voir le versant vente" },
       { href: "/methodologie", label: "Lire les limites de méthode" },
@@ -121,19 +126,24 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
     path: "/outils",
     title: "Outils gratuits",
     description: "Les outils prévus, et ceux qui ne sont pas encore ouverts.",
-    lead: "Les outils doivent donner un résultat honnête avant de demander un contact. Le produit net a un écran. Les autres outils restent fermés.",
+    lead: "Les outils doivent donner un résultat honnête avant de demander un contact. Le produit net et les parcours sans barème sont ouverts. Le radar de prix et le rendement locatif restent fermés.",
     sections: [
       {
-        heading: "Pas encore ouverts",
+        heading: "Encore fermés",
         paragraphs: [
-          "L'estimation préparatoire, vendre avant d'acheter, la comparaison de quartiers et le coût d'achat restent à construire. Ils ne seront pas livrés avec des chiffres de remplacement.",
-          "Le produit net se calcule à partir de votre saisie. Une demande de réponse n'est enregistrée qu'après ce résultat, avec un consentement explicite.",
+          "L'estimation préparatoire, vendre avant d'acheter, la comparaison de quartiers, le coût d'achat et la préparation à la vente donnent un résultat sans prix inventé. Une demande de réponse n'est enregistrée qu'après ce résultat, avec un consentement explicite.",
+          "Le radar des prix, la comparaison acheter ou louer, le budget de rénovation chiffré et le rendement locatif restent fermés. Ils ne seront pas livrés avec des chiffres de remplacement.",
         ],
       },
     ],
     missing: [`Barèmes officiels de courtage et de taxes : ${missing}`],
     links: [
+      { href: "/vendre/estimation-maison", label: "Ouvrir l'estimation préparatoire" },
       { href: "/vendre/calculateur-produit-net", label: "Ouvrir le calcul du produit net" },
+      { href: "/vendre/vendre-avant-acheter", label: "Ouvrir vendre avant d'acheter" },
+      { href: "/vendre/preparer-sa-maison", label: "Ouvrir la préparation à la vente" },
+      { href: "/acheter/comparer-quartiers", label: "Ouvrir les préférences de quartier" },
+      { href: "/acheter/cout-total-achat", label: "Ouvrir le coût d'achat" },
       { href: "/vendre", label: "Lire ce que le produit net inclut" },
       { href: "/methodologie", label: "Lire la méthode" },
     ],
@@ -185,21 +195,21 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
     missing: [`Sources officielles branchées : ${missing}`, `Permis et agence : ${missing}`],
     links: [
       { href: "/vendre", label: "Revenir à la vente" },
-      { href: "/outils", label: "Voir les outils non ouverts" },
+      { href: "/outils", label: "Voir les outils" },
     ],
   },
   {
     slug: "contact",
     path: "/contact",
     title: "Parler à un courtier",
-    description: "La prise de rendez-vous n'est pas ouverte. Aucun lead n'est enregistré.",
-    lead: "La prise de rendez-vous n'est pas ouverte. Cette page n'enregistre aucune demande et n'envoie aucun message.",
+    description: "Cette page n'enregistre aucune demande. Un rendez-vous se demande depuis un outil.",
+    lead: "Cette page n'enregistre aucune demande et n'envoie aucun message. Un rendez-vous se demande depuis un outil, après un résultat.",
     sections: [
       {
         heading: "Pas de formulaire",
         paragraphs: [
-          "Un formulaire qui ferait semblant d'envoyer une demande serait trompeur. Il n'y en a pas.",
-          "Quand la capture existera, le lead devra être enregistré localement avant tout envoi, avec un consentement distinct pour la réponse et pour les messages promotionnels.",
+          "Un formulaire ici ferait semblant d'envoyer une demande. Il n'y en a pas. Les demandes passent par un outil, après un résultat, avec un consentement distinct pour la réponse et pour les messages promotionnels.",
+          "Un rendez-vous demandé n'est pas un créneau confirmé. La confirmation exige une personne autorisée et un créneau réellement saisi.",
         ],
       },
     ],

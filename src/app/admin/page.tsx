@@ -30,7 +30,7 @@ export default async function AdminPage() {
       <p>
         Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}. {totpText}
       </p>
-      <p>Les autres funnels, les rendez-vous et le catalogue d&apos;événements personnalisés ne sont pas livrés.</p>
+      <p>Le catalogue d&apos;événements personnalisés n&apos;est pas livré. Un rendez-vous demandé se confirme depuis les demandes, seulement avec un créneau réel.</p>
       <ul className="nav">
         {roleCan(user.role, "settings.copy.write") || roleCan(user.role, "settings.regulatory.write") ? (
           <li>

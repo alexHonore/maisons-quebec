@@ -2,7 +2,7 @@
 
 Fondation locale du site [https://maisonsquebec.ca](https://maisonsquebec.ca). Ce n'est pas le produit fini.
 
-Le stack est **provisoire** : Next.js (App Router), TypeScript, React. Il reste révisable quand la documentation Ops sera fournie. Aucune doc `ops.tayoo.app` n'a été lue pour ce dépôt. Les réglages du site tiennent dans un SQLite local, remplaçable. Il n'y a pas de Postgres, pas de CRM, pas de webhook, pas de déploiement.
+Le stack est **provisoire** : Next.js (App Router), TypeScript, React. Il reste révisable quand la documentation Ops sera fournie. Aucune doc `ops.tayoo.app` n'a été lue pour ce dépôt. Les réglages du site tiennent dans un SQLite local, remplaçable. Il n'y a pas de Postgres, pas de CRM branché, pas de déploiement. Une destination de webhook peut être enregistrée localement.
 
 ## Lancer
 
@@ -28,6 +28,8 @@ npm run build
 
 - Accueil et pages `/vendre`, `/acheter`, `/marche`, `/outils`, `/guides`, `/methodologie`, `/contact`.
 - `/vendre/calculateur-produit-net` : produit net hypothétique à partir de la saisie. Pas de barème officiel. Une demande de réponse est enregistrée seulement avec consentement, avant tout webhook.
+- Cinq autres parcours sans barème : `/vendre/estimation-maison`, `/vendre/vendre-avant-acheter`, `/vendre/preparer-sa-maison`, `/acheter/comparer-quartiers`, `/acheter/cout-total-achat`. Ce qui manque reste « À compléter — donnée non fournie ». Même consentement, même SQLite avant webhook, même outbox.
+- Dédoublonnage : courriel normalisé plus nom du funnel. Deux noms identiques avec deux courriels restent deux demandes. Un rendez-vous demandé n'est pas confirmé. Seul le propriétaire peut confirmer un créneau réellement saisi.
 - Réglages du site dans `data/site-settings.sqlite` (ou `SITE_SETTINGS_PATH`). Migration `001_site_settings`, annulable. Aucun permis n'est inséré par la migration.
 - `/admin/login` : le premier propriétaire est créé seulement par `ADMIN_BOOTSTRAP_EMAIL` et `ADMIN_BOOTSTRAP_PASSWORD`, si aucun propriétaire n'existe. Ces valeurs sont vides dans `.env.example`. Sans elles, la connexion répond 401. Les comptes suivants sont dans SQLite.
 - Rôles inchangés. Le propriétaire voit les demandes. L'analyste en voit l'état, sans nom ni courriel. L'éditeur ne les voit pas. Le propriétaire et le gestionnaire d'intégrations enregistrent une destination de webhook. Le secret n'est plus affiché ensuite. Sans destination, ou si l'envoi échoue, la demande reste en attente.
@@ -40,7 +42,7 @@ npm run build
 
 - TOTP pour les rôles non privilégiés. Le secret global reste un trou tant qu'il est vide et qu'aucun facteur de compte n'est confirmé.
 - Worker séparé de la requête, sauvegardes, pages de quartiers.
-- Les autres funnels, le catalogue d'événements, les rendez-vous, le dédoublonnage et un CRM.
+- Le catalogue d'événements personnalisés, le calendrier externe, le radar de prix, le rendement locatif, les barèmes officiels et un CRM.
 - Pages de quartiers, guides rédigés, SEO complet, données structurées d'agence.
 - Postgres, studio IA, images, analytique, automatisations.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.

@@ -69,6 +69,21 @@ export default function Home() {
             <p>
               <Link href="/outils">Lire la page des outils</Link>
             </p>
+            <p>
+              <Link href="/vendre/estimation-maison">Préparer une estimation sans prix</Link>
+            </p>
+            <p>
+              <Link href="/vendre/vendre-avant-acheter">Voir vendre avant d&apos;acheter</Link>
+            </p>
+            <p>
+              <Link href="/acheter/comparer-quartiers">Indiquer des préférences de quartier</Link>
+            </p>
+            <p>
+              <Link href="/acheter/cout-total-achat">Séparer les coûts d&apos;achat</Link>
+            </p>
+            <p>
+              <Link href="/vendre/preparer-sa-maison">Cocher la préparation à la vente</Link>
+            </p>
           </div>
         </section>
 

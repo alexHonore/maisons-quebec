@@ -96,7 +96,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
       subpromise: publishedCopy(copy.heroSubpromise, DEFAULT_HERO_SUBPROMISE),
       actions: [
         { href: "/vendre", label: "Je veux vendre", description: "Estimation et produit net, sans prix inventé." },
-        { href: "/acheter", label: "Je veux acheter", description: "Coûts et quartiers, seulement lorsque les sources existent." },
+        { href: "/acheter", label: "Je veux acheter", description: "Coûts et quartiers, sans taux ni classement inventé." },
         { href: "/marche", label: "Explorer mon marché", description: "Québec et Lévis, sans statistique tant qu'aucune source n'est branchée." },
       ],
     },
@@ -104,17 +104,18 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
       "Aucun prix de propriété",
       "Aucune statistique de marché",
       "Aucun témoignage",
-      "Aucun formulaire de contact",
+      "Aucun formulaire sur cette page",
       "Aucun permis inventé",
+      "Aucun rendez-vous confirmé automatiquement",
     ],
     tool: {
-      title: "Pas d'estimation par adresse pour le moment",
-      body: "Le champ d'adresse n'est pas affiché. Aucune source de comparables n'est branchée, et une estimation chiffrée inventée serait trompeuse. Aucun courriel n'est demandé.",
+      title: "Estimation préparatoire, sans prix",
+      body: "L'estimation préparatoire décrit ce qui manque. Elle ne donne pas de prix : aucune vente comparable n'est branchée. Le produit net se calcule seulement avec vos montants.",
     },
     sell: {
       title: "Vendre",
       paragraphs: [
-        "Deux sujets sont prévus. L'estimation préparatoire ne propose aucun prix : aucune vente comparable licite n'est branchée. Une estimation automatisée ne sera jamais présentée comme une évaluation certifiée.",
+        "L'estimation préparatoire est ouverte. Elle ne propose aucun prix : aucune vente comparable licite n'est branchée. Une estimation automatisée ne sera jamais présentée comme une évaluation certifiée.",
         "Le produit net approximatif se calcule à partir des montants que vous fournissez. Aucun barème officiel n'est appliqué à votre place.",
         FORMULA_STATEMENT.included,
         FORMULA_STATEMENT.excluded,
@@ -124,7 +125,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
     buy: {
       title: "Acheter",
       paragraphs: [
-        "Le coût réel d'un achat et la comparaison de quartiers ne sont pas ouverts. Aucun taux hypothécaire, aucune taxe de bienvenue et aucune mensualité ne sont affichés, faute de barème vérifié branché au site.",
+        "La comparaison de quartiers note des préférences. Elle ne nomme aucun quartier. Le coût d'achat sépare les frais uniques et les frais récurrents. Aucun taux, aucune taxe de bienvenue et aucune mensualité ne sont calculés.",
         "Aucune approbation de crédit ni recommandation hypothécaire n'est offerte.",
       ],
     },
@@ -159,7 +160,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
     },
     scenarios: {
       title: "Situations que le site veut éclairer",
-      intro: "Ces parcours ne sont pas encore des outils. Aucun scénario ne produit de calendrier chiffré ni de recommandation de crédit.",
+      intro: "Vendre avant d'acheter a une ligne du temps qualitative. Aucun scénario ne calcule un financement ni une approbation de crédit.",
       items: [
         "J'achète ma première propriété",
         "Je vends pour acheter",
@@ -186,7 +187,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
     },
     contact: {
       title: "Parler à un courtier",
-      body: "La prise de rendez-vous n'est pas ouverte. Une demande de réponse peut suivre le calcul du produit net, seulement avec un consentement explicite.",
+      body: "Une demande de rendez-vous peut suivre un outil, avec un consentement explicite. Elle n'est pas une confirmation. Un créneau n'est confirmé que si une personne autorisée le saisit vraiment.",
     },
     identity: {
       title: "Identification professionnelle",

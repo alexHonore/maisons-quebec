@@ -108,7 +108,7 @@ describe("comptes admin", () => {
 describe("permissions", () => {
   it("applique le moindre privilège sur les cinq rôles", () => {
     const matrix: Record<AdminRole, Array<keyof typeof ADMIN_PERMISSIONS>> = {
-      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo", "audit.read", "leads.read", "leads.aggregate", "webhooks.manage"],
+      owner: ["settings.copy.write", "settings.regulatory.write", "users.manage", "jobs.read", "jobs.run_demo", "audit.read", "leads.read", "leads.aggregate", "webhooks.manage", "appointments.confirm"],
       editor: ["settings.copy.write"],
       analyst: ["jobs.read", "leads.aggregate"],
       integration_manager: ["webhooks.manage"],
