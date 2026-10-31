@@ -13,6 +13,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 1,
     },
+    {
+      url: new URL("/vendre/calculateur-produit-net", site.origin).href,
+      lastModified: CONTENT_DATE,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
     ...PILLAR_PAGES.map((page) => ({
       url: new URL(page.path, site.origin).href,
       lastModified: CONTENT_DATE,

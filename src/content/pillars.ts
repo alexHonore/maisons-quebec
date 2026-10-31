@@ -37,7 +37,7 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       {
         heading: "Produit net approximatif",
         paragraphs: [
-          "L'écran de calcul n'est pas ouvert. La formule, elle, est déjà fixée et testée.",
+          "Le calcul public utilise les montants que vous fournissez. Il n'applique pas de barème officiel.",
           FORMULA_STATEMENT.included,
           FORMULA_STATEMENT.excluded,
           FORMULA_STATEMENT.limit,
@@ -50,6 +50,7 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
       `Identité du courtier annonceur : ${missing}`,
     ],
     links: [
+      { href: "/vendre/calculateur-produit-net", label: "Calculer un produit net hypothétique" },
       { href: "/methodologie", label: "Lire la méthode de calcul" },
       { href: "/acheter", label: "Voir le versant achat" },
       { href: "/contact", label: "La prise de rendez-vous n'est pas ouverte" },
@@ -120,18 +121,19 @@ export const PILLAR_PAGES: readonly PillarPage[] = [
     path: "/outils",
     title: "Outils gratuits",
     description: "Les outils prévus, et ceux qui ne sont pas encore ouverts.",
-    lead: "Les outils doivent donner un résultat honnête avant de demander un contact. Aucun n'est ouvert dans cette version, sauf la formule du produit net, qui n'a pas encore d'écran.",
+    lead: "Les outils doivent donner un résultat honnête avant de demander un contact. Le produit net a un écran. Les autres outils restent fermés.",
     sections: [
       {
         heading: "Pas encore ouverts",
         paragraphs: [
-          "Estimation préparatoire, produit net à l'écran, vendre avant d'acheter, comparaison de quartiers et coût d'achat restent à construire. Ils ne seront pas livrés avec des chiffres de remplacement.",
-          "Un formulaire de lead n'est pas affiché. Enregistrer une demande appartient à une étape ultérieure.",
+          "L'estimation préparatoire, vendre avant d'acheter, la comparaison de quartiers et le coût d'achat restent à construire. Ils ne seront pas livrés avec des chiffres de remplacement.",
+          "Le produit net se calcule à partir de votre saisie. Une demande de réponse n'est enregistrée qu'après ce résultat, avec un consentement explicite.",
         ],
       },
     ],
-    missing: [`Sources de calcul branchées : ${missing}`, `Écran du produit net : ${missing}`],
+    missing: [`Barèmes officiels de courtage et de taxes : ${missing}`],
     links: [
+      { href: "/vendre/calculateur-produit-net", label: "Ouvrir le calcul du produit net" },
       { href: "/vendre", label: "Lire ce que le produit net inclut" },
       { href: "/methodologie", label: "Lire la méthode" },
     ],

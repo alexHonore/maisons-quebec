@@ -30,7 +30,7 @@ export default async function AdminPage() {
       <p>
         Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}. {totpText}
       </p>
-      <p>Les leads et les webhooks ne sont pas disponibles.</p>
+      <p>Les autres funnels, les rendez-vous et le catalogue d&apos;événements personnalisés ne sont pas livrés.</p>
       <ul className="nav">
         {roleCan(user.role, "settings.copy.write") || roleCan(user.role, "settings.regulatory.write") ? (
           <li>
@@ -50,6 +50,16 @@ export default async function AdminPage() {
         {isPrivilegedAdminRole(user.role) ? (
           <li>
             <Link href="/admin/securite">Second facteur</Link>
+          </li>
+        ) : null}
+        {roleCan(user.role, "leads.read") || roleCan(user.role, "leads.aggregate") ? (
+          <li>
+            <Link href="/admin/leads">Demandes</Link>
+          </li>
+        ) : null}
+        {roleCan(user.role, "webhooks.manage") ? (
+          <li>
+            <Link href="/admin/integrations/webhooks">Destinations</Link>
           </li>
         ) : null}
         {roleCan(user.role, "audit.read") ? (

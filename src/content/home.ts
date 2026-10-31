@@ -115,7 +115,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
       title: "Vendre",
       paragraphs: [
         "Deux sujets sont prévus. L'estimation préparatoire ne propose aucun prix : aucune vente comparable licite n'est branchée. Une estimation automatisée ne sera jamais présentée comme une évaluation certifiée.",
-        "Le produit net approximatif se calcule à partir des montants fournis. L'écran public du calculateur n'est pas ouvert.",
+        "Le produit net approximatif se calcule à partir des montants que vous fournissez. Aucun barème officiel n'est appliqué à votre place.",
         FORMULA_STATEMENT.included,
         FORMULA_STATEMENT.excluded,
         FORMULA_STATEMENT.limit,
@@ -186,7 +186,7 @@ export function buildHomeContent(identity: RegulatoryIdentity, copy: PublicCopy 
     },
     contact: {
       title: "Parler à un courtier",
-      body: "La prise de rendez-vous n'est pas ouverte. Aucun formulaire n'enregistre de demande. Les leads ne sont pas captés dans cette version.",
+      body: "La prise de rendez-vous n'est pas ouverte. Une demande de réponse peut suivre le calcul du produit net, seulement avec un consentement explicite.",
     },
     identity: {
       title: "Identification professionnelle",

@@ -27,10 +27,10 @@ npm run build
 ## Ce qui répond
 
 - Accueil et pages `/vendre`, `/acheter`, `/marche`, `/outils`, `/guides`, `/methodologie`, `/contact`.
-- Module `src/domain/sale-proceeds.ts` : produit net déterministe. L'écran du calculateur n'est pas ouvert.
+- `/vendre/calculateur-produit-net` : produit net hypothétique à partir de la saisie. Pas de barème officiel. Une demande de réponse est enregistrée seulement avec consentement, avant tout webhook.
 - Réglages du site dans `data/site-settings.sqlite` (ou `SITE_SETTINGS_PATH`). Migration `001_site_settings`, annulable. Aucun permis n'est inséré par la migration.
 - `/admin/login` : le premier propriétaire est créé seulement par `ADMIN_BOOTSTRAP_EMAIL` et `ADMIN_BOOTSTRAP_PASSWORD`, si aucun propriétaire n'existe. Ces valeurs sont vides dans `.env.example`. Sans elles, la connexion répond 401. Les comptes suivants sont dans SQLite.
-- Rôles : `owner`, `editor`, `analyst`, `integration_manager`, `automation_manager`. Le rôle effectif est relu en base. L'éditeur peut modifier le texte public, pas les permis. L'analyste lit le journal. Le gestionnaire d'automatisation peut lancer le contrôle. Le gestionnaire d'intégrations n'a pas d'action tant que les webhooks n'existent pas. Seul le propriétaire gère les comptes et les champs réglementaires.
+- Rôles inchangés. Le propriétaire voit les demandes. L'analyste en voit l'état, sans nom ni courriel. L'éditeur ne les voit pas. Le propriétaire et le gestionnaire d'intégrations enregistrent une destination de webhook. Le secret n'est plus affiché ensuite. Sans destination, ou si l'envoi échoue, la demande reste en attente.
 - `/admin/jobs` : file persistée (enfiler, exécuter, échec, reprise) et journal du contrôle « champs vides ou renseignés ». Ni permis, ni courriel, ni statistique.
 - `/admin/audit` : qui (identifiant), quoi, quand. Pas de courriel, pas de permis, pas de secret.
 - Cookie `mq_admin_session` : `HttpOnly`, `SameSite=Lax`, `Secure` seulement en HTTPS. `/admin`, `/admin/settings`, `/admin/team` et `/admin/jobs` répondent 401 sans session.
@@ -40,7 +40,7 @@ npm run build
 
 - TOTP pour les rôles non privilégiés. Le secret global reste un trou tant qu'il est vide et qu'aucun facteur de compte n'est confirmé.
 - Worker séparé de la requête, sauvegardes, pages de quartiers.
-- Leads, formulaires de contact, rendez-vous, webhooks, CRM, écran du calculateur.
+- Les autres funnels, le catalogue d'événements, les rendez-vous, le dédoublonnage et un CRM.
 - Pages de quartiers, guides rédigés, SEO complet, données structurées d'agence.
 - Postgres, studio IA, images, analytique, automatisations.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.

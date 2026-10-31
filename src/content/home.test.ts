@@ -14,7 +14,7 @@ describe("accueil", () => {
     assert.ok(text.includes(FORMULA_STATEMENT.excluded));
     assert.ok(text.includes(FORMULA_STATEMENT.limit));
     assert.equal(content.identity.fields.filter((field) => field.display === REGULATORY_EMPTY_LABEL).length, 3);
-    assert.match(text, /ne sont pas captés/);
+    assert.match(text, /consentement explicite/);
     assert.match(text, /https:\/\/maisonsquebec\.ca/);
   });
 

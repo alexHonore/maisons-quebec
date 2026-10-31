@@ -103,6 +103,61 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS admin_audit;",
   },
+  {
+    version: "007_leads_outbox",
+    up: `
+      CREATE TABLE net_proceeds_drafts (
+        id TEXT PRIMARY KEY,
+        input_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE leads (
+        id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        contact_name TEXT NOT NULL,
+        contact_email TEXT NOT NULL,
+        consent_to_respond INTEGER NOT NULL CHECK (consent_to_respond IN (0, 1)),
+        consent_marketing INTEGER NOT NULL CHECK (consent_marketing IN (0, 1)),
+        consent_text_version TEXT NOT NULL,
+        funnel_name TEXT NOT NULL,
+        draft_id TEXT,
+        delivery_status TEXT NOT NULL CHECK (delivery_status IN ('pending', 'delivered'))
+      );
+      CREATE TABLE lead_outbox (
+        id TEXT PRIMARY KEY,
+        lead_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        schema_version TEXT NOT NULL,
+        body TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'delivered')),
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE webhook_destinations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        secret_ciphertext TEXT NOT NULL,
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE webhook_attempts (
+        id TEXT PRIMARY KEY,
+        outbox_id TEXT NOT NULL,
+        destination_id TEXT NOT NULL,
+        attempted_at TEXT NOT NULL,
+        http_status INTEGER,
+        outcome TEXT NOT NULL CHECK (outcome IN ('succeeded', 'failed')),
+        error_code TEXT NOT NULL
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS webhook_attempts;
+      DROP TABLE IF EXISTS lead_outbox;
+      DROP TABLE IF EXISTS webhook_destinations;
+      DROP TABLE IF EXISTS leads;
+      DROP TABLE IF EXISTS net_proceeds_drafts;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

@@ -13,6 +13,7 @@ export const AUDIT_ACTIONS = [
   "job.executed",
   "job.failed",
   "job.retried",
+  "webhook.destination_saved",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

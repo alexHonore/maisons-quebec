@@ -82,6 +82,9 @@ export default function Home() {
               <p>
                 <Link href="/vendre">Lire la page Vendre</Link>
               </p>
+              <p>
+                <Link href="/vendre/calculateur-produit-net">Calculer un produit net hypothétique</Link>
+              </p>
             </article>
             <article id="acheter" className="panel">
               <h2>{content.buy.title}</h2>
