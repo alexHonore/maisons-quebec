@@ -287,6 +287,46 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS page_views;",
   },
+  {
+    version: "014_automations",
+    up: `
+      CREATE TABLE automations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        trigger_event TEXT NOT NULL CHECK (trigger_event IN ('lead.created', 'appointment.requested', 'appointment.confirmed')),
+        action_kind TEXT NOT NULL CHECK (action_kind IN ('webhook.requeue', 'admin.task')),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE automation_versions (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        trigger_event TEXT NOT NULL,
+        action_kind TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        UNIQUE (automation_id, version_number)
+      );
+      CREATE TABLE automation_runs (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        source_event_id TEXT NOT NULL,
+        trigger_event TEXT NOT NULL,
+        action_kind TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('en_file', 'aucune_destination', 'tache_en_file')),
+        subject_id TEXT,
+        created_at TEXT NOT NULL
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS automation_runs;
+      DROP TABLE IF EXISTS automation_versions;
+      DROP TABLE IF EXISTS automations;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

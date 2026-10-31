@@ -17,6 +17,7 @@ import {
   type SaleProceeds,
   type SaleProceedsInput,
 } from "../domain/sale-proceeds";
+import { runMatchingAutomations } from "./automations";
 import { enqueueCustomEvents } from "./event-catalog";
 import { encryptTotpSecret, decryptTotpSecret, totpKeyFromSessionSecret } from "./totp-vault";
 
@@ -209,6 +210,11 @@ function insertRequestedAppointment(
     occurredAt: input.occurredAt,
     consentToRespond: true,
   });
+  runMatchingAutomations(db, {
+    trigger: APPOINTMENT_REQUESTED,
+    sourceEventId: appointmentEventId,
+    occurredAt: input.occurredAt,
+  });
   return appointmentEventId;
 }
 
@@ -321,6 +327,11 @@ export function captureLead(
       occurredAt,
       consentToRespond: true,
     });
+    runMatchingAutomations(db, {
+      trigger: LEAD_EVENT_TYPE,
+      sourceEventId: outboxId,
+      occurredAt,
+    });
     if (answersJson) {
       db.prepare(
         `INSERT INTO funnel_answers (id, lead_id, funnel_name, answers_json, created_at) VALUES (?, ?, ?, ?, ?)`,
@@ -427,6 +438,11 @@ export function confirmAppointment(
       sourceEventId: outboxId,
       occurredAt,
       consentToRespond: Number(lead.consent_to_respond) === 1,
+    });
+    runMatchingAutomations(db, {
+      trigger: APPOINTMENT_CONFIRMED,
+      sourceEventId: outboxId,
+      occurredAt,
     });
     recordAdminAudit(db, {
       actorId: input.actorId,

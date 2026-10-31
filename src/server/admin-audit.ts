@@ -23,6 +23,9 @@ export const AUDIT_ACTIONS = [
   "content.unpublished",
   "content.version_restored",
   "prompt.layer_saved",
+  "automation.saved",
+  "automation.enabled",
+  "automation.disabled",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

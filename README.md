@@ -39,6 +39,7 @@ npm run build
 - `/admin/prompts` : prompt L0 version 1.0.0, en lecture seule, avec son hash. L1 et L2 s'enregistrent à part, par le propriétaire ou l'éditeur, une version à chaque sauvegarde. Sans `OPENROUTER_API_KEY`, « Générer » répond « à connecter » et n'écrit aucun article.
 - Trois scores de préparation, SEO, citabilité et conversion, seuil 70. Sous le seuil, le propriétaire ne publie pas. Une page déjà publique passe en `noindex`. Ce ne sont pas des résultats observés.
 - `/admin/analytics` : période choisie, fuseau America/Toronto. Le propriétaire et l'analyste voient les vues de pages publiques et les demandes déjà enregistrées. Une période sans événement est un trou, pas un zéro. Les exports JSON, CSV et PDF portent les mêmes totaux. Sessions, visiteurs uniques, rétention, temps engagé, Search Console et taux par page restent des trous.
+- `/admin/automations` : définitions versionnées, déclenchées par `lead.created`, `appointment.requested` ou `appointment.confirmed`. Actions de cette tranche : remettre la livraison webhook en file, ou écrire une tâche admin sans donnée personnelle. Le propriétaire et le gestionnaire d'automatisation les éditent. Sans `N8N_BASE_URL`, la page affiche « à connecter » et n'appelle rien.
 - `/admin/audit` : qui (identifiant), quoi, quand. Pas de courriel, pas de permis, pas de secret.
 - Cookie `mq_admin_session` : `HttpOnly`, `SameSite=Lax`, `Secure` seulement en HTTPS. `/admin`, `/admin/settings`, `/admin/team` et `/admin/jobs` répondent 401 sans session.
 - TOTP par compte privilégié (`owner`, `integration_manager`, `automation_manager`) : le secret est chiffré dans SQLite et n'est affiché qu'une fois, à l'enrôlement. Si `ADMIN_TOTP_SECRET` est vide et qu'aucun facteur n'est confirmé, la session n'est pas multifacteur. Le texte dit « MFA non actif ».
@@ -49,7 +50,7 @@ npm run build
 - Worker séparé de la requête, sauvegardes, pages de quartiers.
 - Le calendrier externe, le radar de prix, le rendement locatif, les barèmes officiels, les filtres de destination et un CRM.
 - Versions de pages, redirections, médias, pages de quartiers sourcées, SEO complet, données structurées d'agence.
-- Postgres, images, Search Console, sessions, visiteurs uniques, rétention, temps engagé, automatisations.
+- Postgres, images, Search Console, sessions, visiteurs uniques, rétention, temps engagé, éditeur graphique, publication automatique, appel n8n.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.
 
 ## Configuration

@@ -20,6 +20,7 @@ export const ADMIN_PERMISSIONS = {
   "prompts.read": ["owner", "editor"],
   "prompts.write": ["owner", "editor"],
   "analytics.read": ["owner", "analyst"],
+  "automations.manage": ["owner", "automation_manager"],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

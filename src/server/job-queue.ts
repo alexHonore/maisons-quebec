@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { AUTOMATION_TASK_NAME } from "../domain/automation";
 import type { AdminRole } from "./admin-access";
 import { recordAdminAudit } from "./admin-audit";
 import { DEMO_JOB_NAME, runSettingsPresenceJob } from "./job-journal";
@@ -85,6 +86,10 @@ export function demoJobHandler(db: DatabaseSync, job: QueueJob, now = new Date()
   runSettingsPresenceJob(db, job.actorRole, now);
 }
 
+function runAutomationAdminTask(job: QueueJob): void {
+  if (job.jobName !== AUTOMATION_TASK_NAME) throw new JobError("job_inconnu");
+}
+
 export function executeNextJob(
   db: DatabaseSync,
   input: { actorId: string; now: Date; handlers?: Record<string, JobHandler> },
@@ -104,7 +109,10 @@ export function executeNextJob(
     row.id,
   );
   const job = toJob({ ...row, status: "running", attempts: nextAttempts });
-  const handlers = input.handlers ?? { [DEMO_JOB_NAME]: (database, current) => demoJobHandler(database, current, input.now) };
+  const handlers = input.handlers ?? {
+    [DEMO_JOB_NAME]: (database, current) => demoJobHandler(database, current, input.now),
+    [AUTOMATION_TASK_NAME]: (_database, current) => runAutomationAdminTask(current),
+  };
   try {
     const handler = handlers[job.jobName];
     if (!handler) throw new JobError("job_inconnu");

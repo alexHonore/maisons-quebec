@@ -57,6 +57,11 @@ export default async function AdminPage() {
             <Link href="/admin/jobs">Journal des contrôles</Link>
           </li>
         ) : null}
+        {roleCan(user.role, "automations.manage") ? (
+          <li>
+            <Link href="/admin/automations">Automatisations</Link>
+          </li>
+        ) : null}
         {isPrivilegedAdminRole(user.role) ? (
           <li>
             <Link href="/admin/securite">Second facteur</Link>
