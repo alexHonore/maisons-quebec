@@ -63,5 +63,6 @@ export async function requestHonestFollowUpAction(formData: FormData) {
   } catch {
     // La demande est déjà enregistrée. L'échec de livraison ne la retire pas.
   }
-  redirect(`${path}?demande=recue${saved.duplicate ? "&doublon=1" : ""}`);
+  const flags = [saved.duplicate ? "doublon=1" : "", saved.appointmentAdded ? "rendez=ajoute" : ""].filter((item) => item !== "");
+  redirect(`${path}?demande=recue${flags.length > 0 ? `&${flags.join("&")}` : ""}`);
 }

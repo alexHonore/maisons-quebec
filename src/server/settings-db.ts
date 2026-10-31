@@ -193,6 +193,21 @@ export const MIGRATIONS = [
       DROP TABLE IF EXISTS funnel_drafts;
     `,
   },
+  {
+    version: "009_event_definitions",
+    up: `
+      CREATE TABLE event_definitions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        trigger_event TEXT NOT NULL,
+        schema_version TEXT NOT NULL,
+        funnel_name TEXT,
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS event_definitions;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

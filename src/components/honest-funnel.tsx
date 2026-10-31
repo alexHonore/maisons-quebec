@@ -117,6 +117,7 @@ export function HonestFunnelScreen({
   error,
   received,
   duplicate,
+  appointmentAdded,
   missingResult,
 }: {
   funnel: HonestFunnelName;
@@ -125,6 +126,7 @@ export function HonestFunnelScreen({
   error: string | null;
   received: boolean;
   duplicate: boolean;
+  appointmentAdded: boolean;
   missingResult: boolean;
 }) {
   return (
@@ -136,14 +138,16 @@ export function HonestFunnelScreen({
       {error === "consentement" ? <p role="alert">La demande n&apos;est pas enregistrée sans le consentement de réponse.</p> : null}
       {error === "contact" ? <p role="alert">Le nom ou le courriel n&apos;est pas utilisable. Rien n&apos;a été enregistré.</p> : null}
       {error === "creneau" ? (
-        <p role="alert">La plage souhaitée manque, ou elle contient un courriel. La demande n&apos;est pas enregistrée.</p>
+        <p role="alert">La plage souhaitée manque, ou elle contient un courriel. Aucun rendez-vous n&apos;est ajouté.</p>
       ) : null}
       {missingResult ? <p role="alert">Ce résultat n&apos;est pas disponible.</p> : null}
       {received ? (
         <p role="status">
-          {duplicate
-            ? "Une demande existe déjà pour ce courriel sur cet outil. Le nom, le consentement et le rendez-vous déjà enregistrés n'ont pas été changés."
-            : "Votre demande de réponse est enregistrée. S'il n'y a pas de destination, ou si l'envoi échoue, elle reste en attente. Un rendez-vous demandé n'est pas un créneau confirmé."}
+          {duplicate && appointmentAdded
+            ? "Une demande existe déjà pour ce courriel sur cet outil. Le nom et le consentement n'ont pas été changés. La demande de rendez-vous a été ajoutée. Ce n'est pas une confirmation de créneau."
+            : duplicate
+              ? "Une demande existe déjà pour ce courriel sur cet outil. Le nom et le consentement n'ont pas été changés. Le rendez-vous déjà enregistré, s'il y en a un, n'a pas été écrasé."
+              : "Votre demande de réponse est enregistrée. S'il n'y a pas de destination, ou si l'envoi échoue, elle reste en attente. Un rendez-vous demandé n'est pas un créneau confirmé."}
         </p>
       ) : null}
       <form className="form-grid panel" action={saveHonestFunnelAction}>

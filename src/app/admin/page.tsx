@@ -30,7 +30,7 @@ export default async function AdminPage() {
       <p>
         Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}. {totpText}
       </p>
-      <p>Le catalogue d&apos;événements personnalisés n&apos;est pas livré. Un rendez-vous demandé se confirme depuis les demandes, seulement avec un créneau réel.</p>
+      <p>Le catalogue ne liste que les événements réellement émis. Un rendez-vous demandé se confirme depuis les demandes, seulement avec un créneau réel.</p>
       <ul className="nav">
         {roleCan(user.role, "settings.copy.write") || roleCan(user.role, "settings.regulatory.write") ? (
           <li>
@@ -55,6 +55,11 @@ export default async function AdminPage() {
         {roleCan(user.role, "leads.read") || roleCan(user.role, "leads.aggregate") ? (
           <li>
             <Link href="/admin/leads">Demandes</Link>
+          </li>
+        ) : null}
+        {roleCan(user.role, "events.read") ? (
+          <li>
+            <Link href="/admin/events">Événements</Link>
           </li>
         ) : null}
         {roleCan(user.role, "webhooks.manage") ? (

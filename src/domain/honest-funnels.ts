@@ -4,7 +4,7 @@ import { REGULATORY_EMPTY_LABEL } from "./regulatory-identity";
 export const DEDUP_KEY = "contact_email_normalise+funnel_name" as const;
 
 export const DEDUP_KEY_RULE =
-  "La clé est le courriel normalisé (espaces retirés, minuscules) plus le nom du funnel. La même clé renvoie la demande existante sans modifier le nom, le consentement ni le rendez-vous. Un autre funnel, ou un autre courriel, reste une autre demande. Deux noms identiques avec deux courriels ne sont jamais fusionnés.";
+  "La clé est le courriel normalisé (espaces retirés, minuscules) plus le nom du funnel. La même clé renvoie la demande existante sans modifier le nom ni le consentement. Si aucun rendez-vous n'est enregistré et que la personne le demande, appointment.requested est ajouté. Un rendez-vous déjà demandé ou confirmé n'est pas écrasé, et appointment.confirmed n'est pas émis par cette voie. Un autre funnel, ou un autre courriel, reste une autre demande. Deux noms identiques avec deux courriels ne sont jamais fusionnés.";
 
 export const HONEST_FUNNELS = [
   "estimation_maison",

@@ -12,6 +12,8 @@ export const ADMIN_PERMISSIONS = {
   "leads.aggregate": ["owner", "analyst"],
   "webhooks.manage": ["owner", "integration_manager"],
   "appointments.confirm": ["owner"],
+  "events.read": ["owner", "analyst", "integration_manager"],
+  "events.manage": ["owner", "integration_manager"],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

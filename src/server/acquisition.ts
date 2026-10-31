@@ -17,6 +17,7 @@ import {
   type SaleProceeds,
   type SaleProceedsInput,
 } from "../domain/sale-proceeds";
+import { enqueueCustomEvents } from "./event-catalog";
 import { encryptTotpSecret, decryptTotpSecret, totpKeyFromSessionSecret } from "./totp-vault";
 
 export const FUNNEL_NAME = "produit_net";
@@ -170,11 +171,75 @@ export function readFunnelDraft(
   return checked.draft;
 }
 
+function insertRequestedAppointment(
+  db: DatabaseSync,
+  input: { leadId: string; funnelName: string; window: string; occurredAt: string },
+): string {
+  const appointmentId = randomUUID();
+  const appointmentEventId = randomUUID();
+  db.prepare(
+    `INSERT INTO appointments (id, lead_id, status, window_text, confirmed_slot, requested_at, confirmed_at, confirmed_by)
+     VALUES (?, ?, 'requested', ?, NULL, ?, NULL, NULL)`,
+  ).run(appointmentId, input.leadId, input.window, input.occurredAt);
+  db.prepare(
+    `INSERT INTO lead_outbox (id, lead_id, event_type, schema_version, body, status, created_at)
+     VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+  ).run(
+    appointmentEventId,
+    input.leadId,
+    APPOINTMENT_REQUESTED,
+    LEAD_SCHEMA_VERSION,
+    appointmentBody({
+      eventId: appointmentEventId,
+      eventType: APPOINTMENT_REQUESTED,
+      occurredAt: input.occurredAt,
+      leadId: input.leadId,
+      appointmentId,
+      funnelName: input.funnelName,
+      detailKey: "window_text",
+      detail: input.window,
+    }),
+    input.occurredAt,
+  );
+  enqueueCustomEvents(db, {
+    trigger: APPOINTMENT_REQUESTED,
+    leadId: input.leadId,
+    funnelName: input.funnelName,
+    sourceEventId: appointmentEventId,
+    occurredAt: input.occurredAt,
+    consentToRespond: true,
+  });
+  return appointmentEventId;
+}
+
+function resolveExistingLead(
+  db: DatabaseSync,
+  input: { leadId: string; funnelName: string; requestAppointment: boolean; window: string | null; occurredAt: string },
+): { ok: true; leadId: string; outboxId: string | null; duplicate: true; appointmentAdded: boolean } | { ok: false; reason: "appointment_window_required" | "consent_required" } {
+  const lead = db.prepare("SELECT consent_to_respond FROM leads WHERE id = ?").get(input.leadId);
+  if (Number(lead?.consent_to_respond) !== 1) return { ok: false, reason: "consent_required" };
+  if (!input.requestAppointment) {
+    return { ok: true, leadId: input.leadId, outboxId: null, duplicate: true, appointmentAdded: false };
+  }
+  const existingAppointment = db.prepare("SELECT id FROM appointments WHERE lead_id = ?").get(input.leadId);
+  if (existingAppointment) {
+    return { ok: true, leadId: input.leadId, outboxId: null, duplicate: true, appointmentAdded: false };
+  }
+  if (!input.window) return { ok: false, reason: "appointment_window_required" };
+  const outboxId = insertRequestedAppointment(db, {
+    leadId: input.leadId,
+    funnelName: input.funnelName,
+    window: input.window,
+    occurredAt: input.occurredAt,
+  });
+  return { ok: true, leadId: input.leadId, outboxId, duplicate: true, appointmentAdded: true };
+}
+
 export function captureLead(
   db: DatabaseSync,
   input: LeadCaptureInput,
   now = new Date(),
-): { ok: true; leadId: string; outboxId: string | null; duplicate: boolean } | { ok: false; reason: LeadCaptureFailure } {
+): { ok: true; leadId: string; outboxId: string | null; duplicate: boolean; appointmentAdded: boolean } | { ok: false; reason: LeadCaptureFailure } {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!input.consentToRespond) return { ok: false, reason: "consent_required" };
@@ -220,8 +285,19 @@ export function captureLead(
       .prepare("SELECT id FROM leads WHERE contact_email = ? AND funnel_name = ?")
       .get(email, funnelName);
     if (existing) {
-      db.exec("ROLLBACK");
-      return { ok: true, leadId: String(existing.id), outboxId: null, duplicate: true };
+      const resolved = resolveExistingLead(db, {
+        leadId: String(existing.id),
+        funnelName,
+        requestAppointment: Boolean(input.requestAppointment),
+        window,
+        occurredAt,
+      });
+      if (!resolved.ok) {
+        db.exec("ROLLBACK");
+        return resolved;
+      }
+      db.exec("COMMIT");
+      return resolved;
     }
     if (input.requestAppointment && !window) {
       db.exec("ROLLBACK");
@@ -237,49 +313,56 @@ export function captureLead(
       `INSERT INTO lead_outbox (id, lead_id, event_type, schema_version, body, status, created_at)
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
     ).run(outboxId, leadId, LEAD_EVENT_TYPE, LEAD_SCHEMA_VERSION, body, occurredAt);
+    enqueueCustomEvents(db, {
+      trigger: LEAD_EVENT_TYPE,
+      leadId,
+      funnelName,
+      sourceEventId: outboxId,
+      occurredAt,
+      consentToRespond: true,
+    });
     if (answersJson) {
       db.prepare(
         `INSERT INTO funnel_answers (id, lead_id, funnel_name, answers_json, created_at) VALUES (?, ?, ?, ?, ?)`,
       ).run(randomUUID(), leadId, funnelName, answersJson, occurredAt);
     }
-    if (window) {
-      const appointmentId = randomUUID();
-      const appointmentEventId = randomUUID();
-      db.prepare(
-        `INSERT INTO appointments (id, lead_id, status, window_text, confirmed_slot, requested_at, confirmed_at, confirmed_by)
-         VALUES (?, ?, 'requested', ?, NULL, ?, NULL, NULL)`,
-      ).run(appointmentId, leadId, window, occurredAt);
-      db.prepare(
-        `INSERT INTO lead_outbox (id, lead_id, event_type, schema_version, body, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
-      ).run(
-        appointmentEventId,
-        leadId,
-        APPOINTMENT_REQUESTED,
-        LEAD_SCHEMA_VERSION,
-        appointmentBody({
-          eventId: appointmentEventId,
-          eventType: APPOINTMENT_REQUESTED,
-          occurredAt,
-          leadId,
-          appointmentId,
-          funnelName,
-          detailKey: "window_text",
-          detail: window,
-        }),
-        occurredAt,
-      );
-    }
+    if (window) insertRequestedAppointment(db, { leadId, funnelName, window, occurredAt });
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
     if (isUniqueConflict(error)) {
-      const existing = db.prepare("SELECT id FROM leads WHERE contact_email = ? AND funnel_name = ?").get(email, funnelName);
-      if (existing) return { ok: true, leadId: String(existing.id), outboxId: null, duplicate: true };
+      return settleDuplicateAfterConflict(db, { email, funnelName, requestAppointment: Boolean(input.requestAppointment), window, occurredAt });
     }
     throw error;
   }
-  return { ok: true, leadId, outboxId, duplicate: false };
+  return { ok: true, leadId, outboxId, duplicate: false, appointmentAdded: false };
+}
+
+function settleDuplicateAfterConflict(
+  db: DatabaseSync,
+  input: { email: string; funnelName: string; requestAppointment: boolean; window: string | null; occurredAt: string },
+): { ok: true; leadId: string; outboxId: string | null; duplicate: true; appointmentAdded: boolean } | { ok: false; reason: "appointment_window_required" | "consent_required" } {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const existing = db.prepare("SELECT id FROM leads WHERE contact_email = ? AND funnel_name = ?").get(input.email, input.funnelName);
+    if (!existing) throw new Error("Doublon introuvable.");
+    const resolved = resolveExistingLead(db, {
+      leadId: String(existing.id),
+      funnelName: input.funnelName,
+      requestAppointment: input.requestAppointment,
+      window: input.window,
+      occurredAt: input.occurredAt,
+    });
+    if (!resolved.ok) {
+      db.exec("ROLLBACK");
+      return resolved;
+    }
+    db.exec("COMMIT");
+    return resolved;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function confirmAppointment(
@@ -295,7 +378,7 @@ export function confirmAppointment(
   if (!appointment) return { ok: false, reason: "not_requested" };
   if (String(appointment.status) === "confirmed") return { ok: false, reason: "already_confirmed" };
   if (String(appointment.status) !== "requested") return { ok: false, reason: "not_requested" };
-  const lead = db.prepare("SELECT funnel_name FROM leads WHERE id = ?").get(input.leadId);
+  const lead = db.prepare("SELECT funnel_name, consent_to_respond FROM leads WHERE id = ?").get(input.leadId);
   if (!lead) return { ok: false, reason: "not_requested" };
 
   const outboxId = randomUUID();
@@ -337,6 +420,14 @@ export function confirmAppointment(
       }),
       occurredAt,
     );
+    enqueueCustomEvents(db, {
+      trigger: APPOINTMENT_CONFIRMED,
+      leadId: input.leadId,
+      funnelName: String(lead.funnel_name),
+      sourceEventId: outboxId,
+      occurredAt,
+      consentToRespond: Number(lead.consent_to_respond) === 1,
+    });
     recordAdminAudit(db, {
       actorId: input.actorId,
       actorRole: input.actorRole,

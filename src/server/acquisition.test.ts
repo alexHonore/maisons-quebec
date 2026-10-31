@@ -316,4 +316,92 @@ describe("dédoublonnage et rendez-vous", () => {
     assert.match(auditPlainText(db), /appointment.confirmed/);
     db.close();
   });
+
+  it("ajoute appointment.requested sur un doublon sans second lead ni nouveau consentement", () => {
+    const db = freshDb();
+    const draftId = estimationDraft(db);
+    const first = captureLead(db, {
+      name: "Alice Martin",
+      email: "alice@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId,
+      funnelName: "estimation_maison",
+    }, now);
+    assert.equal(first.ok && first.appointmentAdded === false, true);
+    if (!first.ok) return;
+    assert.deepEqual(captureLead(db, {
+      name: "Bob Martin",
+      email: "alice@example.com",
+      consentToRespond: true,
+      consentMarketing: true,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "",
+    }, now), { ok: false, reason: "appointment_window_required" });
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM appointments").get()?.total, 0);
+    const added = captureLead(db, {
+      name: "Bob Martin",
+      email: " Alice@Example.com ",
+      consentToRespond: true,
+      consentMarketing: true,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "jeudi matin",
+    }, now);
+    assert.equal(added.ok && added.duplicate && added.appointmentAdded && added.leadId === first.leadId, true);
+    const row = listLeadsForOwner(db)[0];
+    assert.equal(row?.name, "Alice Martin");
+    assert.equal(row?.consentMarketing, false);
+    assert.equal(row?.appointmentStatus, "requested");
+    assert.equal(row?.appointmentWindow, "jeudi matin");
+    assert.equal(row?.confirmedSlot, null);
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM leads WHERE contact_email = 'alice@example.com'").get()?.total, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM lead_outbox WHERE event_type = 'lead.created'").get()?.total, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM lead_outbox WHERE event_type = 'appointment.requested'").get()?.total, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM lead_outbox WHERE event_type = 'appointment.confirmed'").get()?.total, 0);
+    const again = captureLead(db, {
+      name: "Carla Martin",
+      email: "alice@example.com",
+      consentToRespond: true,
+      consentMarketing: true,
+      draftId,
+      funnelName: "estimation_maison",
+      requestAppointment: true,
+      appointmentWindow: "vendredi soir",
+    }, now);
+    assert.equal(again.ok && again.duplicate && again.appointmentAdded === false, true);
+    assert.equal(listLeadsForOwner(db)[0]?.name, "Alice Martin");
+    assert.equal(listLeadsForOwner(db)[0]?.consentMarketing, false);
+    assert.equal(listLeadsForOwner(db)[0]?.appointmentWindow, "jeudi matin");
+
+    const netDraft = saveNetProceedsDraft(db, input, now);
+    const netFirst = captureLead(db, {
+      name: "Diane Roy",
+      email: "diane@example.com",
+      consentToRespond: true,
+      consentMarketing: false,
+      draftId: netDraft,
+    }, now);
+    assert.equal(netFirst.ok, true);
+    if (!netFirst.ok) return;
+    const netAdded = captureLead(db, {
+      name: "Autre Diane",
+      email: "diane@example.com",
+      consentToRespond: true,
+      consentMarketing: true,
+      draftId: netDraft,
+      requestAppointment: true,
+      appointmentWindow: "lundi midi",
+    }, now);
+    assert.equal(netAdded.ok && netAdded.duplicate && netAdded.appointmentAdded && netAdded.leadId === netFirst.leadId, true);
+    const diane = listLeadsForOwner(db).find((item) => item.id === netFirst.leadId);
+    assert.equal(diane?.name, "Diane Roy");
+    assert.equal(diane?.consentMarketing, false);
+    assert.equal(diane?.appointmentStatus, "requested");
+    assert.equal(db.prepare("SELECT COUNT(*) AS total FROM lead_outbox WHERE event_type = 'appointment.confirmed'").get()?.total, 0);
+    db.close();
+  });
 });

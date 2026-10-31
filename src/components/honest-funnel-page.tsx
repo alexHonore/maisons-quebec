@@ -32,7 +32,7 @@ export async function HonestFunnelPage({
   searchParams,
 }: {
   funnel: HonestFunnelName;
-  searchParams: Promise<{ resultat?: string; erreur?: string; demande?: string; doublon?: string }>;
+  searchParams: Promise<{ resultat?: string; erreur?: string; demande?: string; doublon?: string; rendez?: string }>;
 }) {
   const params = await searchParams;
   const stored = params.resultat ? readFunnelDraft(settingsDatabase(process.env), funnel, params.resultat) : null;
@@ -48,6 +48,7 @@ export async function HonestFunnelPage({
           error={params.erreur ?? null}
           received={params.demande === "recue"}
           duplicate={params.doublon === "1"}
+          appointmentAdded={params.rendez === "ajoute"}
           missingResult={Boolean(params.resultat) && !result}
         />
       </main>

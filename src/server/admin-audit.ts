@@ -15,6 +15,9 @@ export const AUDIT_ACTIONS = [
   "job.retried",
   "webhook.destination_saved",
   "appointment.confirmed",
+  "event.definition_saved",
+  "event.definition_disabled",
+  "event.definition_enabled",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
