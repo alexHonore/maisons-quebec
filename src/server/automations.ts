@@ -5,9 +5,13 @@ import { recordAdminAudit } from "./admin-audit";
 import { roleCan } from "./admin-permissions";
 import {
   AUTOMATION_TASK_NAME,
+  dryRunAutomation,
   isAutomationAction,
   parseAutomation,
+  parseAutomationDocument,
+  renderAutomationJson,
   type AutomationAction,
+  type AutomationDocumentFailure,
   type AutomationRunState,
 } from "../domain/automation";
 import { isNativeEventType, type NativeEventType } from "../domain/event-catalog";
@@ -254,4 +258,66 @@ export function runMatchingAutomations(
       occurredAt: input.occurredAt,
     });
   }
+}
+
+function readDefinition(db: DatabaseSync, id: string): { name: string; trigger: string; action: string; enabled: boolean } | null {
+  const row = db.prepare("SELECT name, trigger_event, action_kind, enabled FROM automations WHERE id = ?").get(id);
+  if (!row) return null;
+  return {
+    name: String(row.name),
+    trigger: String(row.trigger_event),
+    action: String(row.action_kind),
+    enabled: Number(row.enabled) === 1,
+  };
+}
+
+export function exportAutomationJson(
+  db: DatabaseSync,
+  input: { actorRole: AdminRole; id: string },
+): { ok: true; filename: string; body: string } | { ok: false; reason: "forbidden" | "missing" } {
+  if (!roleCan(input.actorRole, "automations.manage")) return { ok: false, reason: "forbidden" };
+  const current = readDefinition(db, input.id);
+  if (!current) return { ok: false, reason: "missing" };
+  const parsed = parseAutomation(current);
+  if (!parsed.ok) return { ok: false, reason: "missing" };
+  const document = {
+    schema_version: "1.0" as const,
+    name: parsed.definition.name,
+    trigger: parsed.definition.trigger,
+    action: parsed.definition.action,
+  };
+  return { ok: true, filename: `automatisation-${document.name}.json`, body: renderAutomationJson(document) };
+}
+
+export function importAutomationJson(
+  db: DatabaseSync,
+  input: { actorId: string; actorRole: AdminRole; body: string; now: Date },
+): { ok: true; id: string; versionNumber: number } | { ok: false; reason: "forbidden" | AutomationDocumentFailure } {
+  if (!roleCan(input.actorRole, "automations.manage")) return { ok: false, reason: "forbidden" };
+  const parsed = parseAutomationDocument(input.body);
+  if (!parsed.ok) return parsed;
+  return saveAutomation(db, {
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    name: parsed.document.name,
+    trigger: parsed.document.trigger,
+    action: parsed.document.action,
+    now: input.now,
+  });
+}
+
+export function previewAutomation(
+  db: DatabaseSync,
+  input: { actorRole: AdminRole; id: string },
+): { ok: true; summary: string; requeuedWebhook: false; createdTask: false } | { ok: false; reason: "forbidden" | "missing" } {
+  if (!roleCan(input.actorRole, "automations.manage")) return { ok: false, reason: "forbidden" };
+  const current = readDefinition(db, input.id);
+  if (!current) return { ok: false, reason: "missing" };
+  const parsed = parseAutomation(current);
+  if (!parsed.ok) return { ok: false, reason: "missing" };
+  const preview = dryRunAutomation(parsed.definition);
+  const summary = current.enabled
+    ? preview.summary
+    : `Définition inactive. L'essai ne l'active pas. ${preview.summary}`;
+  return { ok: true, summary, requeuedWebhook: false, createdTask: false };
 }

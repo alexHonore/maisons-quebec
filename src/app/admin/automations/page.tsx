@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, unauthorized } from "next/navigation";
-import { checkN8nAction, saveAutomationAction, setAutomationEnabledAction } from "@/app/admin/automations/actions";
+import { checkN8nAction, importAutomationAction, previewAutomationAction, saveAutomationAction, setAutomationEnabledAction } from "@/app/admin/automations/actions";
 import {
   AUTOMATION_ACTION_LABELS,
   AUTOMATION_ACTIONS,
@@ -9,7 +9,7 @@ import {
   AUTOMATION_TRIGGERS,
   requestN8nConnection,
 } from "@/domain/automation";
-import { listAutomationRuns, listAutomations, listAutomationVersions } from "@/server/automations";
+import { listAutomationRuns, listAutomations, listAutomationVersions, previewAutomation } from "@/server/automations";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
 import { settingsDatabase } from "@/server/public-site";
@@ -25,6 +25,8 @@ const ERRORS: Record<string, string> = {
   invalid_name: "Le nom doit être un identifiant stable, sans script.",
   invalid_trigger: "Ce déclencheur n'est pas émis par le site.",
   invalid_action: "Cette action n'est pas permise.",
+  invalid_document: "Ce JSON n'est pas une automatisation de cette tranche.",
+  secret_present: "Le JSON contient un secret, une adresse ou un courriel. Rien n'a été enregistré.",
   missing: "Automatisation introuvable.",
   forbidden: "Action refusée.",
 };
@@ -32,7 +34,7 @@ const ERRORS: Record<string, string> = {
 export default async function AutomationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ enregistre?: string; erreur?: string; n8n?: string }>;
+  searchParams: Promise<{ enregistre?: string; erreur?: string; n8n?: string; essai?: string }>;
 }) {
   const live = await readLiveAdmin();
   if (!live.ok) unauthorized();
@@ -43,6 +45,7 @@ export default async function AutomationsPage({
   const versions = listAutomationVersions(db);
   const runs = listAutomationRuns(db);
   const n8n = requestN8nConnection({ baseUrl: process.env.N8N_BASE_URL });
+  const preview = params.essai ? previewAutomation(db, { actorRole: live.user.role, id: params.essai }) : null;
 
   return (
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
@@ -66,6 +69,7 @@ export default async function AutomationsPage({
       </form>
       {params.enregistre === "1" ? <p role="status">Automatisation enregistrée. Les versions précédentes restent en place.</p> : null}
       {params.erreur ? <p role="alert">{ERRORS[params.erreur] ?? "Enregistrement refusé."}</p> : null}
+      {preview?.ok ? <p role="status">{preview.summary}</p> : null}
       <h2>Définitions</h2>
       {automations.length === 0 ? <p>Aucune automatisation.</p> : null}
       <ul className="plain-list">
@@ -83,6 +87,15 @@ export default async function AutomationsPage({
                   </li>
                 ))}
             </ul>
+            <p>
+              <a href={`/admin/automations/export?id=${automation.id}`}>Exporter JSON</a>
+            </p>
+            <form action={previewAutomationAction}>
+              <input type="hidden" name="id" value={automation.id} />
+              <button className="button" type="submit">
+                Essai à blanc
+              </button>
+            </form>
             <form action={setAutomationEnabledAction}>
               <input type="hidden" name="id" value={automation.id} />
               <input type="hidden" name="enabled" value={automation.enabled ? "0" : "1"} />
@@ -144,6 +157,15 @@ export default async function AutomationsPage({
           </select>
         </label>
         <button type="submit">Enregistrer</button>
+      </form>
+      <h2>Importer un JSON</h2>
+      <p>Le fichier accepté contient le nom, le déclencheur et l&apos;action. Un secret, une adresse ou un courriel est refusé. L&apos;import ajoute une version.</p>
+      <form className="form-grid" action={importAutomationAction}>
+        <label>
+          JSON
+          <textarea name="document" required rows={6} maxLength={4000} />
+        </label>
+        <button type="submit">Importer</button>
       </form>
       <h2>Exécutions</h2>
       <p>Une absence de destination reste « aucune destination ». Ce n&apos;est pas une livraison.</p>
