@@ -6,6 +6,7 @@ import { ContentArticle } from "@/components/content-article";
 import { listContentVersions, readContentForPreview } from "@/server/content-pages";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
+import { SCORE_PUBLICATION_MINIMUM } from "@/domain/editorial-scores";
 import { loadPublicSite, settingsDatabase } from "@/server/public-site";
 import { PublicFrame } from "@/components/public-frame";
 
@@ -22,6 +23,7 @@ const ERRORS: Record<string, string> = {
   published_locked: "Une page publiée ne se modifie pas avec ce rôle.",
   missing: "Page introuvable.",
   forbidden: "Action refusée.",
+  score_below_threshold: "Un score de préparation est sous le seuil. La page n'est pas publiée.",
 };
 
 export default async function ContentPreviewPage({
@@ -59,6 +61,24 @@ export default async function ContentPreviewPage({
       <main id="contenu">
         <ContentArticle page={page} preview />
         <div className="wrap sheet">
+          <h2>Scores de préparation</h2>
+          <p>
+            Barème {page.scores.rubricVersion}. Seuil {SCORE_PUBLICATION_MINIMUM} pour chaque note. Ce n&apos;est pas un classement observé, ni une citation, ni un nombre de leads.
+          </p>
+          <ul className="plain-list">
+            <li>SEO {page.scores.seo}</li>
+            <li>Citabilité {page.scores.citability}</li>
+            <li>Conversion {page.scores.conversion}</li>
+          </ul>
+          <ul className="plain-list">
+            {[...page.scores.seoCriteria, ...page.scores.citabilityCriteria, ...page.scores.conversionCriteria]
+              .filter((criterion) => criterion.earned < criterion.weight)
+              .map((criterion) => (
+                <li key={criterion.id}>
+                  {criterion.label} — {criterion.evidence}
+                </li>
+              ))}
+          </ul>
           {query.enregistre === "1" ? <p role="status">Enregistré. La page publique lit la base maintenant.</p> : null}
           {query.erreur ? <p role="alert">{ERRORS[query.erreur] ?? "Enregistrement refusé."}</p> : null}
           {canWrite ? (

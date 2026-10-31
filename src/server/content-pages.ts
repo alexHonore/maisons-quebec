@@ -9,6 +9,7 @@ import {
   type ContentAssessment,
   type ContentStatus,
 } from "../domain/content-page";
+import { scoreContentPage, type EditorialScores } from "../domain/editorial-scores";
 
 export type ContentPage = {
   readonly id: string;
@@ -23,6 +24,7 @@ export type ContentPage = {
   readonly updatedAt: string;
   readonly publishedAt: string | null;
   readonly assessment: ContentAssessment;
+  readonly scores: EditorialScores;
 };
 
 type ContentSaveFailure = "forbidden" | "invalid" | "duplicate_slug" | "published_locked" | "missing";
@@ -41,7 +43,16 @@ function mapRow(row: Record<string, unknown>): ContentPage {
     updatedAt: String(row.updated_at),
     publishedAt: row.published_at === null || row.published_at === undefined ? null : String(row.published_at),
   } as const;
-  return { ...page, assessment: assessContentPage(page) };
+  const scores = scoreContentPage(page);
+  return { ...page, scores, assessment: assessContentPage(page, { scoresPassed: scores.passed }) };
+}
+
+function recordScoreRun(db: DatabaseSync, pageId: string, scores: EditorialScores, at: string): void {
+  db.prepare(
+    `INSERT INTO content_score_runs (
+       id, page_id, rubric_version, seo_score, citability_score, conversion_score, passed, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), pageId, scores.rubricVersion, scores.seo, scores.citability, scores.conversion, scores.passed ? 1 : 0, at);
 }
 
 const ROW_SQL = `SELECT id, slug, title, description, body, source_note, example, status, created_at, updated_at, published_at
@@ -116,6 +127,14 @@ export function saveContentDraft(
   if (existing && String(existing.status) === "published") {
     appendContentVersion(db, id, input.actorId, now, null);
   }
+  const saved = db.prepare(`${ROW_SQL} WHERE id = ?`).get(id);
+  if (saved) recordScoreRun(db, id, scoreContentPage({
+    title: String(saved.title),
+    description: String(saved.description),
+    body: String(saved.body),
+    sourceNote: String(saved.source_note),
+    example: Number(saved.example) === 1,
+  }), now);
   return { ok: true, id };
 }
 
@@ -154,12 +173,21 @@ function appendContentVersion(
 export function setContentPublished(
   db: DatabaseSync,
   input: { actorId: string; actorRole: AdminRole; id: string; published: boolean; now: Date },
-): { ok: true } | { ok: false; reason: "forbidden" | "missing" } {
+): { ok: true } | { ok: false; reason: "forbidden" | "missing" | "score_below_threshold" } {
   if (!roleCan(input.actorRole, "content.publish")) return { ok: false, reason: "forbidden" };
-  const existing = db.prepare("SELECT id FROM content_pages WHERE id = ?").get(input.id);
+  const existing = db.prepare(`${ROW_SQL} WHERE id = ?`).get(input.id);
   if (!existing) return { ok: false, reason: "missing" };
   const now = input.now.toISOString();
   if (input.published) {
+    const scores = scoreContentPage({
+      title: String(existing.title),
+      description: String(existing.description),
+      body: String(existing.body),
+      sourceNote: String(existing.source_note),
+      example: Number(existing.example) === 1,
+    });
+    recordScoreRun(db, input.id, scores, now);
+    if (!scores.passed) return { ok: false, reason: "score_below_threshold" };
     db.prepare("UPDATE content_pages SET status = 'published', published_at = ?, updated_at = ? WHERE id = ?").run(now, now, input.id);
     appendContentVersion(db, input.id, input.actorId, now, null);
   } else {

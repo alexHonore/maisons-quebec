@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = [
   "content.published",
   "content.unpublished",
   "content.version_restored",
+  "prompt.layer_saved",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

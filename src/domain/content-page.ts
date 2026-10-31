@@ -12,7 +12,7 @@ export const MIN_INDEXABLE_BODY_LENGTH = 600;
 
 export type ContentStatus = "draft" | "published";
 
-export type ContentIndexReason = "draft" | "example" | "thin" | "unsourced_market_claim" | "indexable";
+export type ContentIndexReason = "draft" | "example" | "thin" | "unsourced_market_claim" | "score_below_threshold" | "indexable";
 
 export type ContentDraftInput = {
   readonly slug: string;
@@ -82,15 +82,18 @@ export function hasUnsourcedMarketClaim(page: {
   return textHasMarketClaim(`${page.title}\n${page.description}\n${page.body}`);
 }
 
-export function assessContentPage(page: {
-  readonly status: ContentStatus;
-  readonly title: string;
-  readonly description: string;
-  readonly body: string;
-  readonly sourceNote: string;
-  readonly example: boolean;
-}): ContentAssessment {
-  const reason = indexReason(page);
+export function assessContentPage(
+  page: {
+    readonly status: ContentStatus;
+    readonly title: string;
+    readonly description: string;
+    readonly body: string;
+    readonly sourceNote: string;
+    readonly example: boolean;
+  },
+  options?: { readonly scoresPassed?: boolean },
+): ContentAssessment {
+  const reason = indexReason(page, options?.scoresPassed);
   const indexable = reason === "indexable";
   return {
     visible: page.status === "published",
@@ -100,18 +103,22 @@ export function assessContentPage(page: {
   };
 }
 
-function indexReason(page: {
-  readonly status: ContentStatus;
-  readonly title: string;
-  readonly description: string;
-  readonly body: string;
-  readonly sourceNote: string;
-  readonly example: boolean;
-}): ContentIndexReason {
+function indexReason(
+  page: {
+    readonly status: ContentStatus;
+    readonly title: string;
+    readonly description: string;
+    readonly body: string;
+    readonly sourceNote: string;
+    readonly example: boolean;
+  },
+  scoresPassed?: boolean,
+): ContentIndexReason {
   if (page.status !== "published") return "draft";
   if (page.example) return "example";
   if (page.body.trim().length < MIN_INDEXABLE_BODY_LENGTH) return "thin";
   if (hasUnsourcedMarketClaim(page)) return "unsourced_market_claim";
+  if (scoresPassed === false) return "score_below_threshold";
   return "indexable";
 }
 
@@ -125,6 +132,8 @@ export function indexReasonLabel(reason: ContentIndexReason): string {
       return "texte trop court, non indexé";
     case "unsourced_market_claim":
       return "prix, taux ou décompte sans source, non indexé";
+    case "score_below_threshold":
+      return "seuil de préparation non atteint, non indexé";
     case "indexable":
       return "publiée et indexable";
   }

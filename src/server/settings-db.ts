@@ -248,6 +248,34 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS content_versions;",
   },
+  {
+    version: "012_editorial_scores_prompts",
+    up: `
+      CREATE TABLE prompt_layers (
+        id TEXT PRIMARY KEY,
+        layer TEXT NOT NULL CHECK (layer IN ('L1', 'L2')),
+        version_number INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        UNIQUE (layer, version_number)
+      );
+      CREATE TABLE content_score_runs (
+        id TEXT PRIMARY KEY,
+        page_id TEXT NOT NULL,
+        rubric_version TEXT NOT NULL,
+        seo_score INTEGER NOT NULL,
+        citability_score INTEGER NOT NULL,
+        conversion_score INTEGER NOT NULL,
+        passed INTEGER NOT NULL CHECK (passed IN (0, 1)),
+        created_at TEXT NOT NULL
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS content_score_runs;
+      DROP TABLE IF EXISTS prompt_layers;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {
