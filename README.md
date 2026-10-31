@@ -27,7 +27,7 @@ npm run build
 ## Ce qui répond
 
 - Accueil et pages `/vendre`, `/acheter`, `/marche`, `/outils`, `/guides`, `/methodologie`, `/contact`.
-- `/vendre/calculateur-produit-net` : produit net hypothétique à partir de la saisie. Pas de barème officiel. Une demande de réponse est enregistrée seulement avec consentement, avant tout webhook.
+- `/vendre/calculateur-produit-net` : produit net hypothétique à partir de la saisie, ou d'un lien `?vente=&hypotheque=&courtage=fixe|taux&valeur=`. Le lien ne porte ni nom, ni courriel, ni consentement. Le HTML contient le résultat du module. La demande reste après le résultat et exige le consentement. `/openapi/produit-net` décrit ce GET en OpenAPI 3.1. Aucune création de demande n'y est publique.
 - Cinq autres parcours sans barème : `/vendre/estimation-maison`, `/vendre/vendre-avant-acheter`, `/vendre/preparer-sa-maison`, `/acheter/comparer-quartiers`, `/acheter/cout-total-achat`. Ce qui manque reste « À compléter — donnée non fournie ». Même consentement, même SQLite avant webhook, même outbox.
 - Dédoublonnage : courriel normalisé plus nom du funnel. Deux noms identiques avec deux courriels restent deux demandes. Une seconde soumission de la même clé peut ajouter `appointment.requested` s'il n'y en a pas encore, sans changer le nom ni le consentement. Un rendez-vous déjà demandé n'est pas écrasé. Seul le propriétaire peut confirmer un créneau réellement saisi.
 - `/admin/events` : catalogue limité à `lead.created`, `appointment.requested` et `appointment.confirmed`. Lecture pour le propriétaire, l'analyste et le gestionnaire d'intégrations. Modification pour le propriétaire et le gestionnaire d'intégrations. Pas de script, pas de déclencheur arbitraire, pas de contournement du consentement.
@@ -50,7 +50,7 @@ npm run build
 - Worker séparé de la requête, sauvegardes, pages de quartiers.
 - Le calendrier externe, le radar de prix, le rendement locatif, les barèmes officiels, les filtres de destination et un CRM.
 - Versions de pages, redirections, médias, pages de quartiers sourcées, SEO complet, données structurées d'agence.
-- Postgres, images, Search Console, sessions, visiteurs uniques, rétention, temps engagé, éditeur graphique, publication automatique, appel n8n.
+- Postgres, images, Search Console, sessions, visiteurs uniques, rétention, temps engagé, éditeur graphique, publication automatique, appel n8n, WebMCP, assistant conversationnel.
 - Dépôt distant, DNS, déploiement. Ne pas pousser ce dépôt tant que ce n'est pas demandé.
 
 ## Configuration

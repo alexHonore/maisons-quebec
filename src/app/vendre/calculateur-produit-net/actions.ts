@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { netProceedsInputFromFields } from "@/domain/net-proceeds-form";
+import { readNetProceedsLink } from "@/domain/net-proceeds-link";
 import { captureLead, dispatchPendingOutbox, saveNetProceedsDraft } from "@/server/acquisition";
 import { settingsDatabase } from "@/server/public-site";
 
@@ -22,21 +23,46 @@ export async function calculateNetProceedsAction(formData: FormData) {
   redirect(`/vendre/calculateur-produit-net?resultat=${id}`);
 }
 
+function followUpBack(draftId: string, linkHref: string | null, reason: string): string {
+  if (draftId) return `/vendre/calculateur-produit-net?resultat=${encodeURIComponent(draftId)}&erreur=${reason}`;
+  if (linkHref && linkHref.includes("?")) return `${linkHref}&erreur=${reason}`;
+  return `/vendre/calculateur-produit-net?erreur=${reason}`;
+}
+
 export async function requestFollowUpAction(formData: FormData) {
-  const draftId = String(formData.get("draft_id") ?? "");
-  const saved = captureLead(settingsDatabase(process.env), {
+  const db = settingsDatabase(process.env);
+  let draftId = String(formData.get("draft_id") ?? "").trim();
+  const link = readNetProceedsLink({
+    vente: String(formData.get("vente") ?? ""),
+    hypotheque: String(formData.get("hypotheque") ?? ""),
+    courtage: String(formData.get("courtage") ?? ""),
+    valeur: String(formData.get("valeur") ?? ""),
+    taxe_a: String(formData.get("taxe_a") ?? ""),
+    taxe_b: String(formData.get("taxe_b") ?? ""),
+    penalite: String(formData.get("penalite") ?? ""),
+    legal: String(formData.get("legal") ?? ""),
+    autres: String(formData.get("autres") ?? ""),
+  });
+  const linkHref = link.present ? link.href : null;
+  if (formData.get("consent_respond") !== "on") {
+    redirect(followUpBack(draftId, linkHref, "consentement"));
+  }
+  if (!draftId) {
+    if (!link.present || !link.ok) redirect(followUpBack("", null, "saisie"));
+    draftId = saveNetProceedsDraft(db, link.input);
+  }
+  const saved = captureLead(db, {
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
-    consentToRespond: formData.get("consent_respond") === "on",
+    consentToRespond: true,
     consentMarketing: formData.get("consent_marketing") === "on",
     draftId,
   });
   if (!saved.ok) {
-    const reason = saved.reason === "consent_required" ? "consentement" : "contact";
-    redirect(`/vendre/calculateur-produit-net?resultat=${encodeURIComponent(draftId)}&erreur=${reason}`);
+    redirect(followUpBack(draftId, linkHref, "contact"));
   }
   try {
-    await dispatchPendingOutbox(settingsDatabase(process.env), {
+    await dispatchPendingOutbox(db, {
       now: new Date(),
       sessionSecret: process.env.ADMIN_SESSION_SECRET ?? "",
       transport: async ({ url, body, headers }) => {
