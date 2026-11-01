@@ -4,18 +4,18 @@ Source des exigences : les puces des jalons 0 à 8 dans `docs/cahier-des-charges
 
 États : **fait et testé**, **partiel**, **à connecter**, **non fait**.
 
-Aucun test n'a été relancé pour rédiger ce fichier.
+Le tableau d'origine n'a pas relancé les tests. Les lignes Playwright et les derniers totaux ont été mis à jour après les commandes du 1er novembre 2026.
 
-- Dernier `npm test` dans `/workspace/maisons-quebec` : 117 passés, 0 échec, le 1er novembre 2026, après le commit du tableau d'automatisation.
-- Derniers `npm run lint`, `npm run typecheck` et `npm run build` : succès, le même jour, la même série.
-- Dernier `npm run test:e2e` : 3 passés, 0 échec, le 1er novembre 2026, après le taux par page. Il n'a pas été relancé après le dépôt d'image, `content.open_draft`, les redirections ni le tableau.
+- Dernier `npm test` dans `/workspace/maisons-quebec` : 118 passés, 0 échec, le 1er novembre 2026. Le test ajouté est `src/server/sqlite-backup.test.ts`. Les cases qui citent encore 117/0 décrivent la série d'avant cette sauvegarde.
+- Derniers `npm run lint`, `npm run typecheck` et `npm run build` : succès, le même jour, après cette sauvegarde.
+- Dernier `npm run test:e2e` : 3 passés, 0 échec (6,8 s), le 1er novembre 2026, après le dépôt d'image, `content.open_draft`, les redirections et le tableau. Aucune assertion n'a été affaiblie.
 - Les GET Ops du 31 octobre 2026 sont ceux écrits dans `progression.md`. Ils n'ont pas été refaits.
 
 | Jalon | Exigence | État | Route ou module | Test qui le prouve | Dernier résultat connu | Dépendance externe |
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | Consulter `ops.tayoo.app` et `/docs` sans inventer leur contenu | partiel | aucun module du dépôt ; notes dans le magasin `docs/tayoo-ops-architecture.md` | aucun test du dépôt | GET du 31 octobre 2026, non relancés : racine 302 puis 200 (porte d'accès), `/docs` 302 | Cloudflare Access |
 | 0 | Conventions d'auth, API, secrets et matrice d'intégration Ops | non fait | — | — | docs produit non lues | accès Ops |
-| 0 | Architecture cible (public, admin, données, jobs, analytics, studio, rapports, sauvegardes) | partiel | `docs/decisions.md` du magasin, marquées provisoires | aucun test | pas de sauvegarde, pas d'hébergement | docs Ops non lues |
+| 0 | Architecture cible (public, admin, données, jobs, analytics, studio, rapports, sauvegardes) | partiel | `docs/decisions.md` du magasin, marquées provisoires | aucun test d'architecture | copie SQLite manuelle testée ; pas de sauvegarde planifiée, pas d'hébergement | docs Ops non lues |
 | 0 | Choix n8n conforme à la licence, sans fork | non fait | `src/domain/automation.ts` (`requestN8nConnection`) répond seulement « à connecter » ou « non branché » | `src/domain/automation.test.ts` — « n'appelle pas n8n… » | `npm test` 117/0, non relancé ici | licence et instance n8n |
 | 0 | Feuille de route des jalons, dépendances, critères, risques | partiel | `progression.md` du magasin | aucun test de roadmap | pas d'estimation, pas de plan Hostinger, pas de coût | — |
 | 1 | Accueil et pages piliers en français, sans donnée inventée | fait et testé | `/`, `/vendre`, `/acheter`, `/marche`, `/outils` — `src/content/home.ts`, `src/content/pillars.ts` | `src/content/home.test.ts`, `src/content/pillars.test.ts` | `npm test` 117/0, non relancé ici | — |
@@ -83,19 +83,19 @@ Aucun test n'a été relancé pour rédiger ce fichier.
 | 6 | `auto_publish` refusé | fait et testé | `parseAutomation`, `parseAutomationDocument` | `src/domain/automation.test.ts`, `src/server/automations.test.ts` | `auto_publish` et `content.auto_publish` n'écrivent rien | — |
 | 6 | Rollback d'une automatisation | non fait | les versions sont gardées | aucun test de restauration d'une définition | — | — |
 | 6 | Journal d'exécution et droits owner / automation_manager | partiel | `automation_runs`, `/admin/automations` | `src/server/automations.test.ts` — édition réservée, exécutions enregistrées | pas d'alerte ni de budget | — |
-| 7 | Parcours agentique depuis un lien profond, consentement avant la demande | fait et testé | `/vendre/calculateur-produit-net` | `src/domain/net-proceeds-link.test.ts`, `src/server/acquisition.test.ts` | le parcours navigateur n'a pas été relancé : dernier `npm run test:e2e`, 3/0, avant les tranches suivantes | — |
+| 7 | Parcours agentique depuis un lien profond, consentement avant la demande | fait et testé | `/vendre/calculateur-produit-net` | `src/domain/net-proceeds-link.test.ts`, `src/server/acquisition.test.ts` | `npm run test:e2e` du 1er novembre 2026 : 3 passés, 0 échec, après le dépôt d'image, `content.open_draft`, les redirections et le tableau | — |
 | 7 | OpenAPI 3.1 du calcul, sans POST de lead public | fait et testé | `/openapi/produit-net` | `src/domain/openapi-produit-net.test.ts` | `npm test` 117/0, non relancé ici | — |
 | 7 | WebMCP | non fait | aucune route | aucun test | marqué « non branché » dans `decisions.md`, sans protocole simulé | spécification stable absente |
 | 7 | Assistant conversationnel avec sources | non fait | — | — | — | OpenRouter |
 | 7 | Observatoire, newsletter, widgets, expansion territoriale | non fait | — | — | — | données et consentements |
 | 7 | SEO génératif vérifié sur les pages publiques | non fait | — | — | — | moteurs de réponse |
-| 8 | Tests unitaires du dépôt | partiel | `src/**/*.test.ts` | la commande `npm test` | 117 passés, 0 échec, le 1er novembre 2026 ; non relancé pour cette ligne | — |
-| 8 | Lint, types et build | partiel | `package.json` | `npm run lint`, `npm run typecheck`, `npm run build` | succès le 1er novembre 2026 ; non relancés pour cette ligne | — |
-| 8 | Trois parcours Playwright | partiel | `e2e/parcours.spec.ts` | les trois `test(...)` du fichier | dernier `npm run test:e2e` : 3 passés, 0 échec, non relancé après image, brouillon, redirections et tableau | Chromium local |
-| 8 | Parcours visiteur → lead → webhook livré → admin | partiel | `e2e/parcours.spec.ts` — « visiteur, calcul… » | le test e2e laisse l'outbox en attente ; la livraison 2xx est dans `src/server/webhook-delivery.test.ts` | e2e non relancé ; `npm test` 117/0 couvre le 2xx local | destination webhook réelle |
-| 8 | Parcours admin → IA → médias → scores → publication | partiel | `e2e/parcours.spec.ts` — « brouillon humain… » | le test exige « à connecter » ou « non branché » et échoue si un article ou une image est fabriqué | e2e non relancé depuis le taux par page | OpenRouter, Pexels, Unsplash |
-| 8 | Parcours workflow → exécution → article mis à jour → PDF | non fait | le troisième test e2e couvre JSON, essai à blanc, tâche et égalité PDF/JSON | il ne met pas à jour un article | e2e non relancé | — |
+| 8 | Tests unitaires du dépôt | partiel | `src/**/*.test.ts` | la commande `npm test` | 118 passés, 0 échec, le 1er novembre 2026 | — |
+| 8 | Lint, types et build | partiel | `package.json` | `npm run lint`, `npm run typecheck`, `npm run build` | succès le 1er novembre 2026, après la sauvegarde SQLite | — |
+| 8 | Trois parcours Playwright | partiel | `e2e/parcours.spec.ts` | les trois `test(...)` du fichier | `npm run test:e2e` du 1er novembre 2026 : 3 passés, 0 échec (6,8 s), après le dépôt d'image, `content.open_draft`, les redirections et le tableau | Chromium local |
+| 8 | Parcours visiteur → lead → webhook livré → admin | partiel | `e2e/parcours.spec.ts` — « visiteur, calcul… » | le test e2e laisse l'outbox en attente ; la livraison 2xx est dans `src/server/webhook-delivery.test.ts` | `npm run test:e2e` du 1er novembre 2026 : 3 passés, 0 échec. L'outbox du visiteur reste en attente. Le 2xx local est dans `npm test` 118/0 | destination webhook réelle |
+| 8 | Parcours admin → IA → médias → scores → publication | partiel | `e2e/parcours.spec.ts` — « brouillon humain… » | le test exige « à connecter » ou « non branché » et échoue si un article ou une image est fabriqué | `npm run test:e2e` du 1er novembre 2026 : 3 passés, 0 échec. Le test exige toujours « à connecter » ou « non branché » | OpenRouter, Pexels, Unsplash |
+| 8 | Parcours workflow → exécution → article mis à jour → PDF | non fait | le troisième test e2e couvre JSON, essai à blanc, tâche et égalité PDF/JSON | il ne met pas à jour un article | `npm run test:e2e` du 1er novembre 2026 : 3 passés, 0 échec. Ce parcours ne met toujours pas à jour un article | — |
 | 8 | Contrôles d'accès de bout en bout, conformité OACIQ / Loi 25 / LCAP | non fait | identité réglementaire vide testée, pas la checklist | `src/domain/regulatory-identity.test.ts` ne vaut pas une conformité | `docs/compliance-checklist.md` absent | validation humaine |
 | 8 | Performance, crawl, reprise après panne | non fait | — | — | — | — |
-| 8 | Guide d'exploitation, sauvegarde, coût, monitoring | non fait | `.env.example` et les lacunes de `progression.md` existent | aucun test | — | — |
+| 8 | Guide d'exploitation, sauvegarde, coût, monitoring | partiel | `scripts/backup-sqlite.ts`, commande `npm run backup:sqlite` | `src/server/sqlite-backup.test.ts` — « restaure une ligne connue… » | `hero_title` relu dans une base temporaire ; un échec de copie ne remplace pas le fichier de destination. Pas de guide d'exploitation, pas de coût, pas de monitoring, pas de sauvegarde planifiée | — |
 | 8 | Ne pas déployer ni changer le DNS sans autorisation | partiel | aucun workflow de déploiement dans le dépôt | aucun test | aucun déploiement fait pendant ces tranches ; ce n'est pas une preuve automatisée | autorisation du fondateur |

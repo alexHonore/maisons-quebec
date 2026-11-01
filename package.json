@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/domain/*.test.ts src/server/*.test.ts src/content/*.test.ts",
     "test:e2e": "playwright test",
+    "backup:sqlite": "node --import tsx scripts/backup-sqlite.ts",
     "ci": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {

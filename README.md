@@ -28,6 +28,18 @@ npm run ci
 
 `npm test` exécute le calcul du produit net, les pages piliers, l'identité réglementaire, les migrations SQLite, le TOTP et la connexion admin.
 
+## Sauvegarder SQLite
+
+```bash
+npm run backup:sqlite
+```
+
+La commande lit `SITE_SETTINGS_PATH`, ou `data/site-settings.sqlite`. Elle écrit une copie dans `data/backups/` (ou le chemin passé en argument), la restaure dans une base temporaire et relit `hero_title`. Si la copie ou la relecture échoue, le processus s'arrête sans présenter de sauvegarde. Un chemin explicite remplace la destination :
+
+```bash
+npm run backup:sqlite -- /tmp/site-settings.sqlite
+```
+
 ## Ce qui répond
 
 - Accueil et pages `/vendre`, `/acheter`, `/marche`, `/outils`, `/guides`, `/methodologie`, `/contact`.
@@ -52,7 +64,7 @@ npm run ci
 ## Ce qui n'est pas fait
 
 - TOTP pour les rôles non privilégiés. Le secret global reste un trou tant qu'il est vide et qu'aucun facteur de compte n'est confirmé.
-- Worker séparé de la requête, sauvegardes, pages de quartiers.
+- Worker séparé de la requête, sauvegardes planifiées, pages de quartiers.
 - Le calendrier externe, le radar de prix, le rendement locatif, les barèmes officiels, les filtres de destination et un CRM.
 - Versions de pages, redirections, médias, pages de quartiers sourcées, SEO complet, données structurées d'agence.
 - Postgres, Pexels, Unsplash et génération branchés, Search Console, éditeur graphique, publication automatique, appel n8n, WebMCP, assistant conversationnel.
