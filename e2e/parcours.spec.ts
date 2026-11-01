@@ -159,12 +159,47 @@ test.describe.serial("trois parcours existants", () => {
     await expect(page.getByText("Aucune livraison n'a été remise en file.")).toBeVisible();
     expect(countRows("job_queue")).toBe(0);
 
+    await page.goto("/guides/lire-une-methode");
+    const publicHtml = await page.locator("article").innerHTML();
+    expect(publicHtml).toContain("Cette méthode ne constitue pas un prix de marché.");
+    await page.goto("/admin/contenu");
+    const publishedHref = await page.locator("li", { hasText: "publiée" }).getByRole("link", { name: "Lire une méthode" }).getAttribute("href");
+    await page.goto(publishedHref ?? "");
+    await expect(page.getByRole("heading", { name: "Lire une méthode" })).toBeVisible();
+    const publishedBody = await page.locator("textarea[name='body']").inputValue();
+    expect(publishedBody).toContain("Cette méthode ne constitue pas un prix de marché.");
+    const pagesBefore = countRows("content_pages");
+
+    await page.goto("/admin/automations");
+    const create = page.locator("form", { has: page.getByRole("button", { name: "Enregistrer", exact: true }) });
+    await create.locator("input[name='name']").fill("ouvrir_e2e");
+    await create.locator("select[name='action']").selectOption("content.open_draft");
+    await create.locator("input[name='page']").fill("lire-une-methode");
+    await create.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    const draftAutomation = page.locator("li", { hasText: "ouvrir_e2e" });
+    await expect(draftAutomation).toContainText("Ouvrir un brouillon depuis une page publiée");
+    await draftAutomation.getByRole("button", { name: "Essai à blanc" }).click();
+    await expect(page.getByText("Aucun brouillon n'a été créé.")).toBeVisible();
+    expect(countRows("content_pages")).toBe(pagesBefore);
+
     const email = "visiteur.auto@example.com";
     await submitLead(page, email, "Visiteur Auto");
     const stored = leadRows().find((row) => row.email === email);
     expect(stored?.outbox).toBe("pending");
     await page.goto("/admin/jobs");
     await expect(page.getByText("automation.tache_admin — queued")).toBeVisible();
+    await page.goto("/guides/lire-une-methode");
+    expect(await page.locator("article").innerHTML()).toBe(publicHtml);
+    expect((await page.request.get("/guides/lire-une-methode-brouillon")).status()).toBe(404);
+    await page.goto("/admin/contenu");
+    const draftRow = page.locator("li", { hasText: "/guides/lire-une-methode-brouillon" });
+    await expect(draftRow).toContainText("brouillon");
+    const draftHref = await draftRow.getByRole("link", { name: "Lire une méthode" }).getAttribute("href");
+    await page.goto(draftHref ?? "");
+    await expect(page.getByText("Le public ne voit pas ce brouillon.")).toBeVisible();
+    await expect(page.locator("textarea[name='body']")).toHaveValue(publishedBody);
+    await page.goto("/admin/automations");
+    await expect(page.getByText("content.open_draft — brouillon ouvert")).toBeVisible();
 
     const today = torontoToday();
     const jsonResponse = await page.request.get(`/admin/analytics/export?format=json&from=${today}&to=${today}`);
