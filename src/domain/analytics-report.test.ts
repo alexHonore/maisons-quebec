@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildAnalyticsReport,
+  chartBarLength,
+  chartTotalsFromCsv,
+  chartTotalsFromJson,
   periodBounds,
+  readChart,
   renderAnalyticsCsv,
   renderAnalyticsJson,
   renderAnalyticsPdf,
@@ -11,7 +15,27 @@ import {
   signatureFromPdf,
   torontoDayStartUtc,
   totalsSignature,
+  type AnalyticsReport,
 } from "./analytics-report";
+
+function assertChartMatchesExports(report: AnalyticsReport): void {
+  const json = renderAnalyticsJson(report);
+  const csv = renderAnalyticsCsv(report);
+  const pdf = renderAnalyticsPdf(report);
+  const chart = readChart(pdf);
+  const totals = chart.map(({ name, state, count }) => ({ name, state, count }));
+  assert.deepEqual(totals, chartTotalsFromJson(json));
+  assert.deepEqual(totals, chartTotalsFromCsv(csv));
+  const max = chart.reduce((highest, item) => item.count === null ? highest : Math.max(highest, item.count), 0);
+  for (const item of chart) {
+    if (item.state === "trou") {
+      assert.equal(item.bar, null);
+      assert.equal(item.count, null);
+    } else {
+      assert.equal(item.bar, chartBarLength(item.count ?? 0, max));
+    }
+  }
+}
 
 describe("rapport d'analytique", () => {
   it("borne les journées au fuseau de Toronto", () => {
@@ -44,9 +68,12 @@ describe("rapport d'analytique", () => {
     assert.equal(empty.conversions.state, "trou");
     const signature = totalsSignature(empty);
     assert.equal(signature.includes(" 0"), false);
+    const emptyPdf = renderAnalyticsPdf(empty);
     assert.equal(signatureFromJson(renderAnalyticsJson(empty)), signature);
     assert.equal(signatureFromCsv(renderAnalyticsCsv(empty)), signature);
-    assert.equal(signatureFromPdf(renderAnalyticsPdf(empty)), signature);
+    assert.equal(signatureFromPdf(emptyPdf), signature);
+    assertChartMatchesExports(empty);
+    assert.equal(emptyPdf.includes(" 10 re"), false);
 
     const observed = buildAnalyticsReport({
       from: "2026-07-15",
@@ -77,9 +104,14 @@ describe("rapport d'analytique", () => {
     assert.deepEqual(observed.leads, { state: "observe", count: 1 });
     assert.equal(observed.pages.state === "observe" && observed.pages.rows.find((row) => row.path === "/vendre")?.views, 2);
     const observedSignature = totalsSignature(observed);
+    const observedPdf = renderAnalyticsPdf(observed);
     assert.equal(signatureFromJson(renderAnalyticsJson(observed)), observedSignature);
     assert.equal(signatureFromCsv(renderAnalyticsCsv(observed)), observedSignature);
-    assert.equal(signatureFromPdf(renderAnalyticsPdf(observed)), observedSignature);
+    assert.equal(signatureFromPdf(observedPdf), observedSignature);
+    assertChartMatchesExports(observed);
+    const observedChart = readChart(observedPdf);
+    assert.equal(observedChart.find((item) => item.name === "returns")?.bar, 0);
+    assert.equal(observedChart.find((item) => item.name === "engaged_seconds")?.bar, null);
     const packed = `${renderAnalyticsJson(observed)}\n${renderAnalyticsCsv(observed)}\n${renderAnalyticsPdf(observed)}`;
     assert.equal(packed.includes("personne@example.com"), false);
     assert.equal(observed.notCollected.includes("Search Console"), true);
@@ -109,8 +141,15 @@ describe("rapport d'analytique", () => {
     assert.deepEqual(report.returns, { state: "observe", count: 1 });
     assert.deepEqual(report.engagedSeconds, { state: "observe", count: 7 });
     const signature = totalsSignature(report);
+    const pdf = renderAnalyticsPdf(report);
     assert.equal(signatureFromJson(renderAnalyticsJson(report)), signature);
     assert.equal(signatureFromCsv(renderAnalyticsCsv(report)), signature);
-    assert.equal(signatureFromPdf(renderAnalyticsPdf(report)), signature);
+    assert.equal(signatureFromPdf(pdf), signature);
+    assertChartMatchesExports(report);
+    const chart = readChart(pdf);
+    assert.equal(chart.find((item) => item.name === "engaged_seconds")?.count, 7);
+    assert.equal(chart.find((item) => item.name === "returns")?.count, 1);
+    assert.equal(chart.find((item) => item.name === "sessions")?.bar, null);
+    assert.equal(chart.find((item) => item.name === "leads")?.bar, null);
   });
 });

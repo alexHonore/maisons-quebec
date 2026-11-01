@@ -93,6 +93,7 @@ export default async function AnalyticsPage({
             <a href={`/admin/analytics/export?format=csv&from=${report.from}&to=${report.to}`}>Exporter CSV</a>
             {" · "}
             <a href={`/admin/analytics/export?format=pdf&from=${report.from}&to=${report.to}`}>Exporter PDF</a>
+            {" — le graphique ne dessine que les totaux mesurés."}
           </p>
         </>
       ) : null}

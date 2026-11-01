@@ -217,6 +217,107 @@ function pdfEscape(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
 }
 
+export const CHART_BAR_MAX = 120;
+
+const CHART_LABELS = [
+  ["page_views", "vues"],
+  ["sessions", "sessions"],
+  ["unique_visitors", "visiteurs"],
+  ["engaged_seconds", "secondes"],
+  ["returns", "retours"],
+  ["leads", "demandes"],
+] as const;
+
+export type ChartTotalName = (typeof CHART_LABELS)[number][0];
+
+export type ChartTotal = {
+  readonly name: ChartTotalName;
+  readonly state: "observe" | "trou";
+  readonly count: number | null;
+  readonly bar: number | null;
+};
+
+export function chartBarLength(count: number, maxCount: number): number {
+  if (count <= 0 || maxCount <= 0) return 0;
+  const scaled = Math.round((count / maxCount) * CHART_BAR_MAX);
+  return Math.max(1, scaled);
+}
+
+function chartRows(report: AnalyticsReport): ChartTotal[] {
+  const measures = [
+    report.pageViews,
+    report.sessions,
+    report.uniqueVisitors,
+    report.engagedSeconds,
+    report.returns,
+    report.leads,
+  ];
+  const maxCount = measures.reduce((max, item) => item.state === "observe" ? Math.max(max, item.count) : max, 0);
+  return CHART_LABELS.map(([name], index) => {
+    const measure = measures[index];
+    if (!measure || measure.state === "trou") return { name, state: "trou", count: null, bar: null };
+    return { name, state: "observe", count: measure.count, bar: chartBarLength(measure.count, maxCount) };
+  });
+}
+
+function chartCommands(report: AnalyticsReport): string[] {
+  const commands = [
+    "BT",
+    "/F1 11 Tf",
+    "48 400 Td",
+    "(Graphique des totaux mesures : vues, sessions, visiteurs, secondes, retours, demandes) Tj",
+    "ET",
+    "178 250 m",
+    "178 385 l",
+    "S",
+  ];
+  chartRows(report).forEach((row, index) => {
+    const label = CHART_LABELS[index]?.[1] ?? row.name;
+    const y = 370 - index * 22;
+    if (row.bar !== null) commands.push(`${178} ${y - 3} ${row.bar} 10 re`, "f");
+    const value = row.state === "observe" ? `observe ${row.count}` : "trou";
+    commands.push("BT", "/F1 9 Tf", `48 ${y} Td`, `(graphique ${label} ${value}) Tj`, "ET");
+  });
+  return commands;
+}
+
+const CHART_ITEM = /(?:(\d+) (\d+) (\d+) 10 re\nf\n)?BT\n\/F1 9 Tf\n\d+ \d+ Td\n\(graphique (vues|sessions|visiteurs|secondes|retours|demandes) (observe|trou)(?: (\d+))?\) Tj\nET/g;
+
+export function readChart(pdf: string): ChartTotal[] {
+  const found = [...pdf.matchAll(CHART_ITEM)];
+  if (found.length !== CHART_LABELS.length) throw new Error("Graphique incomplet.");
+  return CHART_LABELS.map(([name, label], index) => {
+    const match = found[index];
+    if (!match || match[4] !== label) throw new Error("Graphique incomplet.");
+    if (match[5] === "trou") {
+      if (match[3] !== undefined) throw new Error("Un trou est dessiné.");
+      return { name, state: "trou", count: null, bar: null };
+    }
+    if (match[3] === undefined || match[6] === undefined) throw new Error("Barre absente.");
+    return { name, state: "observe", count: Number(match[6]), bar: Number(match[3]) };
+  });
+}
+
+export function chartTotalsFromJson(json: string): Pick<ChartTotal, "name" | "state" | "count">[] {
+  const parsed = JSON.parse(json) as { totals?: Record<string, { state?: string; count?: number }> };
+  return CHART_LABELS.map(([name]) => {
+    const row = parsed.totals?.[name];
+    if (row?.state === "observe" && typeof row.count === "number") return { name, state: "observe", count: row.count };
+    return { name, state: "trou", count: null };
+  });
+}
+
+export function chartTotalsFromCsv(csv: string): Pick<ChartTotal, "name" | "state" | "count">[] {
+  const lines = signatureFromCsv(csv).split("\n");
+  return CHART_LABELS.map(([name]) => {
+    const line = lines.find((item) => item.startsWith(`total ${name} `));
+    if (!line) throw new Error("Total absent du CSV.");
+    const [, , state, countText] = line.split(" ");
+    if (state === "observe") return { name, state: "observe", count: Number(countText) };
+    return { name, state: "trou", count: null };
+  });
+}
+
 export function renderAnalyticsPdf(report: AnalyticsReport): string {
   const lines = [
     "Maisons Quebec",
@@ -230,7 +331,7 @@ export function renderAnalyticsPdf(report: AnalyticsReport): string {
     if (index > 0) commands.push("0 -16 Td");
     commands.push(`(${pdfEscape(line)}) Tj`);
   });
-  commands.push("ET");
+  commands.push("ET", ...chartCommands(report));
   const stream = commands.join("\n");
   const objects = [
     "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
