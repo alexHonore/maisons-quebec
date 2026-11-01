@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { EngagementBeacon } from "@/components/engagement-beacon";
 import { readSiteUrl } from "@/domain/site-url";
 import "./globals.css";
 
@@ -33,7 +34,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fr-CA" className={`${sans.variable} ${display.variable}`}>
-      <body>{children}</body>
+      <body>
+        <EngagementBeacon />
+        {children}
+      </body>
     </html>
   );
 }

@@ -13,7 +13,7 @@ import {
 import { ADMIN_ROLES } from "./admin-access";
 import { canReadAnalytics, loadAnalyticsReport } from "./analytics";
 import { saveNetProceedsDraft, captureLead } from "./acquisition";
-import { recordPageView, recordPublicVisit } from "./page-views";
+import { recordEngagedSeconds, recordPageView, recordPublicVisit } from "./page-views";
 import { migrateUp } from "./settings-db";
 
 const input = {
@@ -113,7 +113,22 @@ describe("collecte analytique", () => {
     const quiet = loadAnalyticsReport(db, { from: "2026-08-01", to: "2026-08-01" });
     assert.equal(quiet?.sessions.state, "trou");
     assert.equal(quiet?.uniqueVisitors.state, "trou");
+    assert.equal(quiet?.engagedSeconds.state, "trou");
+    assert.equal(quiet?.returns.state, "trou");
     assert.equal(quiet ? totalsSignature(quiet).includes(" 0") : false, false);
+    assert.equal(recordEngagedSeconds(db, { visitorId: "personne@example.com", seconds: 7, now: when }), false);
+    assert.equal(recordEngagedSeconds(db, { visitorId: first.visitorId, seconds: 7, now: when }), true);
+    const withSignal = loadAnalyticsReport(db, { from: "2026-07-15", to: "2026-07-15" });
+    assert.deepEqual(withSignal?.engagedSeconds, { state: "observe", count: 7 });
+    assert.deepEqual(withSignal?.returns, { state: "observe", count: 0 });
+    if (!withSignal) return;
+    const signalSignature = totalsSignature(withSignal);
+    assert.equal(signatureFromJson(renderAnalyticsJson(withSignal)), signalSignature);
+    assert.equal(signatureFromCsv(renderAnalyticsCsv(withSignal)), signalSignature);
+    assert.equal(signatureFromPdf(renderAnalyticsPdf(withSignal)), signalSignature);
+    recordPublicVisit(db, { path: "/", now: new Date("2026-07-16T16:00:00.000Z"), visitorCookie: first.visitorId, sessionCookie: first.sessionId });
+    const twoDays = loadAnalyticsReport(db, { from: "2026-07-15", to: "2026-07-16" });
+    assert.deepEqual(twoDays?.returns, { state: "observe", count: 1 });
     db.close();
   });
 });

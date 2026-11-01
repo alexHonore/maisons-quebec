@@ -34,8 +34,7 @@ export default async function AnalyticsPage({
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Analytique</h1>
       <p>
-        Une session démarre à une vue de page publique. Un visiteur unique est un identifiant distinct sur la période. Le cookie ne contient ni nom ni courriel.
-        Le temps engagé et la rétention restent des trous : la page n&apos;envoie aucune durée.
+        Une session démarre à une vue de page publique. Un visiteur unique est un identifiant distinct sur la période. Le temps engagé est la somme des secondes envoyées pendant que l&apos;onglet est visible. Un retour est le même identifiant vu sur deux jours civils de Toronto.
       </p>
       <ul className="plain-list">
         {NOT_COLLECTED.map((item) => (
@@ -60,6 +59,8 @@ export default async function AnalyticsPage({
           <p>Vues de pages : {measureText(report.pageViews)}</p>
           <p>Sessions : {measureText(report.sessions)}</p>
           <p>Visiteurs uniques : {measureText(report.uniqueVisitors)}</p>
+          <p>Temps engagé : {report.engagedSeconds.state === "observe" ? `${report.engagedSeconds.count} s` : "Trou — aucun signal de secondes visibles. Ce n'est pas un zéro mesuré."}</p>
+          <p>Retours : {report.returns.state === "trou" ? "Trou — aucune visite. Ce n'est pas un zéro mesuré." : report.returns.count === 0 ? "0 — des visites, aucun identifiant revu un autre jour." : String(report.returns.count)}</p>
           <p>Demandes : {measureText(report.leads)}</p>
           <h2>Pages</h2>
           {report.pages.state === "trou" ? (

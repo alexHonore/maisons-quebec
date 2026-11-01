@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { planPublicVisit } from "../domain/visit-tracking";
+import { parseEngagedSeconds } from "../domain/engaged-time";
+import { planPublicVisit, readTrackingId } from "../domain/visit-tracking";
 
 export const VISITOR_COOKIE = "mq_visitor";
 export const SESSION_COOKIE = "mq_session";
@@ -63,6 +64,22 @@ export function recordPublicVisit(
     throw error;
   }
   return { ok: true, visitorId: plan.visitorId, sessionId: plan.sessionId, startSession: plan.startSession };
+}
+
+export function recordEngagedSeconds(
+  db: DatabaseSync,
+  input: { visitorId: string | null | undefined; seconds: unknown; now?: Date },
+): boolean {
+  const visitorId = readTrackingId(input.visitorId);
+  const seconds = parseEngagedSeconds(input.seconds);
+  if (!visitorId || seconds === null) return false;
+  db.prepare("INSERT INTO engaged_seconds (id, visitor_id, seconds, occurred_at) VALUES (?, ?, ?, ?)").run(
+    randomUUID(),
+    visitorId,
+    seconds,
+    (input.now ?? new Date()).toISOString(),
+  );
+  return true;
 }
 
 export function shouldRecordRequest(input: {

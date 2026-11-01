@@ -28,6 +28,7 @@ describe("rapport d'analytique", () => {
       to: "2026-07-15",
       pageViews: [{ path: "/", occurredAt: "2026-07-15T03:00:00.000Z", visitorId: "11111111-1111-4111-8111-111111111111" }],
       sessions: [{ startedAt: "2026-07-15T03:00:00.000Z" }],
+      engagedSeconds: [{ seconds: 7, occurredAt: "2026-07-15T03:00:00.000Z" }],
       leads: [{ funnelName: "produit_net", createdAt: "2026-07-16T05:00:00.000Z" }],
     });
     assert.ok(empty);
@@ -35,6 +36,8 @@ describe("rapport d'analytique", () => {
     assert.equal(empty.pageViews.state, "trou");
     assert.equal(empty.sessions.state, "trou");
     assert.equal(empty.uniqueVisitors.state, "trou");
+    assert.equal(empty.engagedSeconds.state, "trou");
+    assert.equal(empty.returns.state, "trou");
     assert.equal(empty.leads.state, "trou");
     assert.equal("count" in empty.pageViews, false);
     assert.equal(empty.pages.state, "trou");
@@ -58,6 +61,7 @@ describe("rapport d'analytique", () => {
         { startedAt: "2026-07-15T04:00:00.000Z" },
         { startedAt: "2026-07-14T12:00:00.000Z" },
       ],
+      engagedSeconds: [],
       leads: [
         { funnelName: "produit_net", createdAt: "2026-07-15T15:00:00.000Z" },
         { funnelName: "produit_net", createdAt: "2026-07-14T15:00:00.000Z" },
@@ -68,6 +72,8 @@ describe("rapport d'analytique", () => {
     assert.deepEqual(observed.pageViews, { state: "observe", count: 4 });
     assert.deepEqual(observed.sessions, { state: "observe", count: 1 });
     assert.deepEqual(observed.uniqueVisitors, { state: "observe", count: 2 });
+    assert.equal(observed.engagedSeconds.state, "trou");
+    assert.deepEqual(observed.returns, { state: "observe", count: 0 });
     assert.deepEqual(observed.leads, { state: "observe", count: 1 });
     assert.equal(observed.pages.state === "observe" && observed.pages.rows.find((row) => row.path === "/vendre")?.views, 2);
     const observedSignature = totalsSignature(observed);
@@ -76,9 +82,35 @@ describe("rapport d'analytique", () => {
     assert.equal(signatureFromPdf(renderAnalyticsPdf(observed)), observedSignature);
     const packed = `${renderAnalyticsJson(observed)}\n${renderAnalyticsCsv(observed)}\n${renderAnalyticsPdf(observed)}`;
     assert.equal(packed.includes("personne@example.com"), false);
-    assert.equal(observed.notCollected.includes("rétention"), true);
-    assert.equal(observed.notCollected.includes("temps engagé"), true);
     assert.equal(observed.notCollected.includes("Search Console"), true);
+    assert.equal(observed.notCollected.includes("rétention"), false);
+    assert.equal(observed.notCollected.includes("temps engagé"), false);
     assert.equal(observed.notCollected.includes("sessions"), false);
+  });
+
+  it("compte un retour sur deux jours de Toronto et les secondes envoyées", () => {
+    const visitor = "11111111-1111-4111-8111-111111111111";
+    const report = buildAnalyticsReport({
+      from: "2026-07-15",
+      to: "2026-07-16",
+      pageViews: [
+        { path: "/", occurredAt: "2026-07-15T16:00:00.000Z", visitorId: visitor },
+        { path: "/", occurredAt: "2026-07-16T16:00:00.000Z", visitorId: visitor },
+      ],
+      sessions: [],
+      engagedSeconds: [
+        { seconds: 7, occurredAt: "2026-07-15T16:00:00.000Z" },
+        { seconds: 4, occurredAt: "2026-07-14T16:00:00.000Z" },
+      ],
+      leads: [],
+    });
+    assert.ok(report);
+    if (!report) return;
+    assert.deepEqual(report.returns, { state: "observe", count: 1 });
+    assert.deepEqual(report.engagedSeconds, { state: "observe", count: 7 });
+    const signature = totalsSignature(report);
+    assert.equal(signatureFromJson(renderAnalyticsJson(report)), signature);
+    assert.equal(signatureFromCsv(renderAnalyticsCsv(report)), signature);
+    assert.equal(signatureFromPdf(renderAnalyticsPdf(report)), signature);
   });
 });

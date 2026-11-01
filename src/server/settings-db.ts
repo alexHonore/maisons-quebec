@@ -367,6 +367,18 @@ export const MIGRATIONS = [
       ALTER TABLE page_views DROP COLUMN visitor_id;
     `,
   },
+  {
+    version: "017_engaged_seconds",
+    up: `
+      CREATE TABLE engaged_seconds (
+        id TEXT PRIMARY KEY,
+        visitor_id TEXT NOT NULL,
+        seconds INTEGER NOT NULL CHECK (seconds > 0),
+        occurred_at TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS engaged_seconds;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

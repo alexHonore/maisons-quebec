@@ -2,12 +2,7 @@ import { readTrackingId } from "./visit-tracking";
 
 export const ANALYTICS_TIME_ZONE = "America/Toronto";
 
-export const NOT_COLLECTED = [
-  "rétention",
-  "temps engagé",
-  "Search Console",
-  "taux de conversion par page",
-] as const;
+export const NOT_COLLECTED = ["Search Console", "taux de conversion par page"] as const;
 
 export type ObservedCount = { readonly state: "observe"; readonly count: number };
 export type Gap = { readonly state: "trou" };
@@ -23,6 +18,8 @@ export type AnalyticsReport = {
   readonly pageViews: ObservedCount | Gap;
   readonly sessions: ObservedCount | Gap;
   readonly uniqueVisitors: ObservedCount | Gap;
+  readonly engagedSeconds: ObservedCount | Gap;
+  readonly returns: ObservedCount | Gap;
   readonly leads: ObservedCount | Gap;
   readonly pages: { readonly state: "observe"; readonly rows: readonly PageViewRow[] } | Gap;
   readonly conversions: { readonly state: "observe"; readonly rows: readonly FunnelLeadRow[] } | Gap;
@@ -84,6 +81,18 @@ function inPeriod(iso: string, startIso: string, endIso: string): boolean {
   return iso >= startIso && iso < endIso;
 }
 
+export function torontoCivilDate(iso: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const formatted = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ANALYTICS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  return /^\d{4}-\d{2}-\d{2}$/.test(formatted) ? formatted : null;
+}
+
 function observedOrGap(count: number): ObservedCount | Gap {
   return count === 0 ? { state: "trou" } : { state: "observe", count };
 }
@@ -93,15 +102,30 @@ export function buildAnalyticsReport(input: {
   readonly to: string;
   readonly pageViews: readonly { readonly path: string; readonly occurredAt: string; readonly visitorId?: string | null }[];
   readonly sessions: readonly { readonly startedAt: string }[];
+  readonly engagedSeconds: readonly { readonly seconds: number; readonly occurredAt: string }[];
   readonly leads: readonly { readonly funnelName: string; readonly createdAt: string }[];
 }): AnalyticsReport | null {
   const bounds = periodBounds(input.from, input.to);
   if (!bounds) return null;
   const views = input.pageViews.filter((row) => inPeriod(row.occurredAt, bounds.startIso, bounds.endIso));
   const sessions = input.sessions.filter((row) => inPeriod(row.startedAt, bounds.startIso, bounds.endIso));
+  const engaged = input.engagedSeconds.filter((row) => inPeriod(row.occurredAt, bounds.startIso, bounds.endIso));
   const visitors = new Set(
     views.map((row) => readTrackingId(row.visitorId)).filter((id): id is string => id !== null),
   );
+  const daysByVisitor = new Map<string, Set<string>>();
+  for (const view of views) {
+    const id = readTrackingId(view.visitorId);
+    const day = torontoCivilDate(view.occurredAt);
+    if (!id || !day) continue;
+    const days = daysByVisitor.get(id) ?? new Set<string>();
+    days.add(day);
+    daysByVisitor.set(id, days);
+  }
+  let returnCount = 0;
+  for (const days of daysByVisitor.values()) {
+    if (days.size >= 2) returnCount += 1;
+  }
   const leads = input.leads.filter((row) => inPeriod(row.createdAt, bounds.startIso, bounds.endIso));
   const pageCounts = new Map<string, number>();
   for (const view of views) pageCounts.set(view.path, (pageCounts.get(view.path) ?? 0) + 1);
@@ -121,6 +145,8 @@ export function buildAnalyticsReport(input: {
     pageViews: observedOrGap(views.length),
     sessions: observedOrGap(sessions.length),
     uniqueVisitors: observedOrGap(visitors.size),
+    engagedSeconds: engaged.length === 0 ? { state: "trou" } : { state: "observe", count: engaged.reduce((sum, row) => sum + row.seconds, 0) },
+    returns: views.length === 0 || daysByVisitor.size === 0 ? { state: "trou" } : { state: "observe", count: returnCount },
     leads: observedOrGap(leads.length),
     pages: pageRows.length === 0 ? { state: "trou" } : { state: "observe", rows: pageRows },
     conversions: funnelRows.length === 0 ? { state: "trou" } : { state: "observe", rows: funnelRows },
@@ -135,6 +161,8 @@ export function reportTotalLines(report: AnalyticsReport): TotalLine[] {
     { kind: "total", name: "page_views", state: report.pageViews.state, count: report.pageViews.state === "observe" ? report.pageViews.count : null },
     { kind: "total", name: "sessions", state: report.sessions.state, count: report.sessions.state === "observe" ? report.sessions.count : null },
     { kind: "total", name: "unique_visitors", state: report.uniqueVisitors.state, count: report.uniqueVisitors.state === "observe" ? report.uniqueVisitors.count : null },
+    { kind: "total", name: "engaged_seconds", state: report.engagedSeconds.state, count: report.engagedSeconds.state === "observe" ? report.engagedSeconds.count : null },
+    { kind: "total", name: "returns", state: report.returns.state, count: report.returns.state === "observe" ? report.returns.count : null },
     { kind: "total", name: "leads", state: report.leads.state, count: report.leads.state === "observe" ? report.leads.count : null },
   ];
   if (report.pages.state === "observe") {
@@ -166,6 +194,8 @@ export function renderAnalyticsJson(report: AnalyticsReport): string {
       page_views: report.pageViews,
       sessions: report.sessions,
       unique_visitors: report.uniqueVisitors,
+      engaged_seconds: report.engagedSeconds,
+      returns: report.returns,
       leads: report.leads,
     },
     pages: report.pages,
@@ -193,7 +223,7 @@ export function renderAnalyticsPdf(report: AnalyticsReport): string {
     `periode ${report.from} ${report.to}`,
     "fuseau America/Toronto",
     ...totalsSignature(report).split("\n"),
-    "non collecte retention temps engage Search Console taux par page",
+    "non collecte Search Console taux par page",
   ];
   const commands = ["BT", "/F1 11 Tf", "72 740 Td"];
   lines.forEach((line, index) => {
