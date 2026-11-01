@@ -10,6 +10,7 @@ import {
   type ContentStatus,
 } from "../domain/content-page";
 import { scoreContentPage, type EditorialScores } from "../domain/editorial-scores";
+import { resolvePublishedRedirect } from "./content-redirects";
 
 export type ContentPage = {
   readonly id: string;
@@ -348,5 +349,6 @@ export function listIndexableGuidePaths(db: DatabaseSync): Array<{ slug: string;
     .all()
     .map(mapRow)
     .filter((page) => page.assessment.indexable)
+    .filter((page) => resolvePublishedRedirect(db, `/guides/${page.slug}`) === null)
     .map((page) => ({ slug: page.slug, updatedAt: page.updatedAt }));
 }

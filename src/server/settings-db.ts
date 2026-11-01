@@ -446,6 +446,19 @@ export const MIGRATIONS = [
       ALTER TABLE automation_versions DROP COLUMN page_slug;
     `,
   },
+  {
+    version: "020_content_redirects",
+    up: `
+      CREATE TABLE content_redirects (
+        id TEXT PRIMARY KEY,
+        from_path TEXT NOT NULL UNIQUE,
+        to_path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL
+      );
+    `,
+    down: "DROP TABLE IF EXISTS content_redirects;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

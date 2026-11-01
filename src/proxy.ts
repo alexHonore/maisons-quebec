@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authorizeAdminRequest, ADMIN_COOKIE_NAME, renderAdminRefusalDocument } from "@/server/admin-access";
 import { adminPathRequiresSession } from "@/server/admin-gate";
+import { resolvePublishedRedirect } from "@/server/content-redirects";
 import { recordPublicVisit, SESSION_COOKIE, shouldRecordRequest, VISITOR_COOKIE, VISITOR_MAX_AGE_SECONDS } from "@/server/page-views";
 import { settingsDatabase } from "@/server/public-site";
 
@@ -51,6 +52,15 @@ function continueWithPath(request: NextRequest, pathname: string) {
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname.replace(/\/$/, "") || "/";
   if (!adminPathRequiresSession(pathname)) {
+    if (request.method === "GET" || request.method === "HEAD") {
+      const redirect = resolvePublishedRedirect(settingsDatabase(process.env), pathname);
+      if (redirect) {
+        const url = request.nextUrl.clone();
+        url.pathname = redirect.pathname;
+        url.search = "";
+        return NextResponse.redirect(url, redirect.status);
+      }
+    }
     return continueWithPath(request, pathname);
   }
 

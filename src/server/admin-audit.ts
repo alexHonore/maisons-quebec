@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = [
   "content.published",
   "content.unpublished",
   "content.version_restored",
+  "content.redirect_saved",
   "prompt.layer_saved",
   "automation.saved",
   "automation.enabled",
