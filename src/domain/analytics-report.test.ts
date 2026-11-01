@@ -6,6 +6,7 @@ import {
   chartTotalsFromCsv,
   chartTotalsFromJson,
   exportSignature,
+  pageRateDeltas,
   periodBounds,
   readChart,
   renderAnalyticsCsv,
@@ -121,6 +122,7 @@ describe("rapport d'analytique", () => {
     assert.equal(observed.notCollected.includes("rétention"), false);
     assert.equal(observed.notCollected.includes("temps engagé"), false);
     assert.equal(observed.notCollected.includes("sessions"), false);
+    assert.equal(observed.notCollected.includes("taux de conversion par page"), false);
   });
 
   it("compte un retour sur deux jours de Toronto et les secondes envoyées", () => {
@@ -221,5 +223,87 @@ describe("rapport d'analytique", () => {
     assert.equal(signatureFromPdf(renderAnalyticsPdf(empty, empty)), bothHoles);
     assert.equal(signatureFromCsv(renderAnalyticsCsv(empty, empty)), bothHoles);
     assert.equal(signatureFromJson(renderAnalyticsJson(empty, empty)), bothHoles);
+  });
+
+  it("calcule le taux seulement pour un parcours dont le chemin est connu", () => {
+    const withRate = buildAnalyticsReport({
+      from: "2026-07-15",
+      to: "2026-07-15",
+      pageViews: [
+        { path: "/", occurredAt: "2026-07-15T16:00:00.000Z" },
+        { path: "/", occurredAt: "2026-07-15T17:00:00.000Z" },
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-15T16:00:00.000Z" },
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-15T18:00:00.000Z" },
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-15T19:00:00.000Z" },
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-15T20:00:00.000Z" },
+      ],
+      sessions: [],
+      engagedSeconds: [],
+      leads: [
+        { funnelName: "estimation_maison", createdAt: "2026-07-15T16:30:00.000Z" },
+        { funnelName: "produit_net", createdAt: "2026-07-15T18:00:00.000Z" },
+        { funnelName: "funnel_inconnu", createdAt: "2026-07-15T18:30:00.000Z" },
+      ],
+    });
+    const other = buildAnalyticsReport({
+      from: "2026-07-16",
+      to: "2026-07-16",
+      pageViews: [
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-16T16:00:00.000Z" },
+        { path: "/vendre/estimation-maison", occurredAt: "2026-07-16T17:00:00.000Z" },
+      ],
+      sessions: [],
+      engagedSeconds: [],
+      leads: [{ funnelName: "estimation_maison", createdAt: "2026-07-16T16:30:00.000Z" }],
+    });
+    const hole = buildAnalyticsReport({
+      from: "2026-07-17",
+      to: "2026-07-17",
+      pageViews: [],
+      sessions: [],
+      engagedSeconds: [],
+      leads: [{ funnelName: "estimation_maison", createdAt: "2026-07-17T16:00:00.000Z" }],
+    });
+    assert.ok(withRate && other && hole);
+    if (!withRate || !other || !hole) return;
+    assert.equal(withRate.pageRates.some((row) => row.path === "/"), false);
+    assert.equal(withRate.pageRates.some((row) => row.funnel === "funnel_inconnu"), false);
+    assert.deepEqual(withRate.pageRates.find((row) => row.path === "/vendre/estimation-maison")?.rate, {
+      state: "observe",
+      leads: 1,
+      views: 4,
+      text: "1/4",
+    });
+    assert.deepEqual(withRate.pageRates.find((row) => row.funnel === "produit_net")?.rate, { state: "trou" });
+    const signature = exportSignature(withRate);
+    assert.equal(signature.includes("rate /vendre/estimation-maison observe 1/4"), true);
+    assert.equal(signature.includes("rate / observe"), false);
+    assert.equal(signature.includes("rate /funnel_inconnu"), false);
+    assert.equal(signature.includes("rate /vendre/calculateur-produit-net observe"), false);
+    const json = renderAnalyticsJson(withRate);
+    const csv = renderAnalyticsCsv(withRate);
+    const pdf = renderAnalyticsPdf(withRate);
+    assert.equal(signatureFromJson(json), signature);
+    assert.equal(signatureFromCsv(csv), signature);
+    assert.equal(signatureFromPdf(pdf), signature);
+    assert.equal(json.includes("1/4"), true);
+    assert.equal(csv.includes("rate,/vendre/estimation-maison,observe,1/4"), true);
+    const chart = readChart(pdf);
+    assert.equal(chart.length, 6);
+    assert.equal(chart.some((item) => item.name === "engaged_seconds" && item.bar !== null), false);
+    assert.deepEqual(pageRateDeltas(withRate, other).find((item) => item.path === "/vendre/estimation-maison")?.delta, {
+      state: "observe",
+      text: "-1/4",
+    });
+    const compared = exportSignature(withRate, other);
+    assert.equal(compared.includes("ecart_rate /vendre/estimation-maison observe -1/4"), true);
+    assert.equal(signatureFromJson(renderAnalyticsJson(withRate, other)), compared);
+    assert.equal(signatureFromCsv(renderAnalyticsCsv(withRate, other)), compared);
+    assert.equal(signatureFromPdf(renderAnalyticsPdf(withRate, other)), compared);
+    const againstHole = pageRateDeltas(withRate, hole).find((item) => item.path === "/vendre/estimation-maison");
+    assert.deepEqual(againstHole?.delta, { state: "trou" });
+    const holeSignature = exportSignature(withRate, hole);
+    assert.equal(holeSignature.includes("ecart_rate /vendre/estimation-maison observe"), false);
+    assert.equal(holeSignature.includes("ecart_rate /vendre/estimation-maison trou trou"), true);
   });
 });

@@ -1,14 +1,28 @@
+import { FUNNEL_PATHS, HONEST_FUNNELS } from "./honest-funnels";
+import { NET_PROCEEDS_PAGE_PATH } from "./net-proceeds-link";
 import { readTrackingId } from "./visit-tracking";
 
 export const ANALYTICS_TIME_ZONE = "America/Toronto";
 
-export const NOT_COLLECTED = ["Search Console", "taux de conversion par page"] as const;
+export const NOT_COLLECTED = ["Search Console"] as const;
+
+/** Parcours dont la page est connue. Une autre page n'a pas de taux. */
+export const JOURNEY_PATHS: readonly { readonly funnel: string; readonly path: string }[] = [
+  { funnel: "produit_net", path: NET_PROCEEDS_PAGE_PATH },
+  ...HONEST_FUNNELS.map((funnel) => ({ funnel, path: FUNNEL_PATHS[funnel] })),
+];
 
 export type ObservedCount = { readonly state: "observe"; readonly count: number };
 export type Gap = { readonly state: "trou" };
 
 export type PageViewRow = { readonly path: string; readonly views: number };
 export type FunnelLeadRow = { readonly funnel: string; readonly leads: number };
+
+export type PageRate = {
+  readonly path: string;
+  readonly funnel: string;
+  readonly rate: { readonly state: "observe"; readonly leads: number; readonly views: number; readonly text: string } | { readonly state: "trou" };
+};
 
 export type AnalyticsReport = {
   readonly version: "1.0";
@@ -23,6 +37,7 @@ export type AnalyticsReport = {
   readonly leads: ObservedCount | Gap;
   readonly pages: { readonly state: "observe"; readonly rows: readonly PageViewRow[] } | Gap;
   readonly conversions: { readonly state: "observe"; readonly rows: readonly FunnelLeadRow[] } | Gap;
+  readonly pageRates: readonly PageRate[];
   readonly notCollected: readonly string[];
 };
 
@@ -150,15 +165,67 @@ export function buildAnalyticsReport(input: {
     leads: observedOrGap(leads.length),
     pages: pageRows.length === 0 ? { state: "trou" } : { state: "observe", rows: pageRows },
     conversions: funnelRows.length === 0 ? { state: "trou" } : { state: "observe", rows: funnelRows },
+    pageRates: pageRates(views, leads),
     notCollected: NOT_COLLECTED,
   };
 }
 
+function pageRates(
+  views: readonly { readonly path: string }[],
+  leads: readonly { readonly funnelName: string }[],
+): PageRate[] {
+  const viewsByPath = new Map<string, number>();
+  for (const view of views) viewsByPath.set(view.path, (viewsByPath.get(view.path) ?? 0) + 1);
+  const leadsByFunnel = new Map<string, number>();
+  for (const lead of leads) leadsByFunnel.set(lead.funnelName, (leadsByFunnel.get(lead.funnelName) ?? 0) + 1);
+  const rows: PageRate[] = [];
+  for (const journey of JOURNEY_PATHS) {
+    const viewCount = viewsByPath.get(journey.path) ?? 0;
+    const leadCount = leadsByFunnel.get(journey.funnel) ?? 0;
+    if (viewCount === 0 && leadCount === 0) continue;
+    if (viewCount === 0) {
+      rows.push({ path: journey.path, funnel: journey.funnel, rate: { state: "trou" } });
+      continue;
+    }
+    rows.push({
+      path: journey.path,
+      funnel: journey.funnel,
+      rate: { state: "observe", leads: leadCount, views: viewCount, text: `${leadCount}/${viewCount}` },
+    });
+  }
+  return rows.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function gcd(left: number, right: number): number {
+  let a = Math.abs(left);
+  let b = Math.abs(right);
+  while (b !== 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a || 1;
+}
+
+export function rateDifference(
+  current: PageRate["rate"] | undefined,
+  baseline: PageRate["rate"] | undefined,
+): { readonly state: "observe"; readonly text: string } | { readonly state: "trou" } {
+  if (!current || current.state !== "observe" || !baseline || baseline.state !== "observe") return { state: "trou" };
+  const numerator = current.leads * baseline.views - baseline.leads * current.views;
+  const denominator = current.views * baseline.views;
+  if (denominator === 0) return { state: "trou" };
+  const divisor = gcd(numerator, denominator);
+  const sign = numerator < 0 ? "-" : "";
+  return { state: "observe", text: `${sign}${Math.abs(numerator) / divisor}/${Math.abs(denominator) / divisor}` };
+}
+
 export type TotalLine = {
-  readonly kind: "total" | "page" | "funnel" | "compare" | "compare_page" | "compare_funnel" | "ecart";
+  readonly kind: "total" | "page" | "funnel" | "rate" | "compare" | "compare_page" | "compare_funnel" | "compare_rate" | "ecart" | "ecart_rate";
   readonly name: string;
   readonly state: "observe" | "trou";
   readonly count: number | null;
+  readonly ratio?: string | null;
 };
 
 const MEASURES = [
@@ -200,32 +267,78 @@ export function reportTotalLines(report: AnalyticsReport): TotalLine[] {
   } else {
     lines.push({ kind: "funnel", name: "*", state: "trou", count: null });
   }
+  for (const row of report.pageRates) {
+    lines.push({
+      kind: "rate",
+      name: row.path,
+      state: row.rate.state,
+      count: null,
+      ratio: row.rate.state === "observe" ? row.rate.text : null,
+    });
+  }
   return lines;
 }
 
-function lineText(line: TotalLine): string {
-  return `${line.kind} ${line.name} ${line.state} ${line.count === null ? "trou" : String(line.count)}`;
+function lineValue(line: TotalLine): string {
+  if (line.kind === "rate" || line.kind === "compare_rate" || line.kind === "ecart_rate") {
+    return line.state === "observe" ? (line.ratio ?? "trou") : "trou";
+  }
+  return line.count === null ? "trou" : String(line.count);
 }
 
-function renamedLines(lines: readonly TotalLine[], total: TotalLine["kind"], page: TotalLine["kind"], funnel: TotalLine["kind"]): TotalLine[] {
-  return lines.map((line) => ({
-    ...line,
-    kind: line.kind === "total" ? total : line.kind === "page" ? page : funnel,
-  }));
+function lineText(line: TotalLine): string {
+  return `${line.kind} ${line.name} ${line.state} ${lineValue(line)}`;
+}
+
+function renamedKind(kind: TotalLine["kind"]): TotalLine["kind"] {
+  if (kind === "total") return "compare";
+  if (kind === "page") return "compare_page";
+  if (kind === "funnel") return "compare_funnel";
+  if (kind === "rate") return "compare_rate";
+  return kind;
+}
+
+function renamedLines(lines: readonly TotalLine[]): TotalLine[] {
+  return lines.map((line) => ({ ...line, kind: renamedKind(line.kind) }));
 }
 
 export function exportLines(report: AnalyticsReport, comparison?: AnalyticsReport): TotalLine[] {
   if (!comparison) return reportTotalLines(report);
   return [
     ...reportTotalLines(report),
-    ...renamedLines(reportTotalLines(comparison), "compare", "compare_page", "compare_funnel"),
+    ...renamedLines(reportTotalLines(comparison)),
     ...reportDeltas(report, comparison).map((item) => ({
       kind: "ecart" as const,
       name: item.name,
       state: item.delta.state,
       count: item.delta.state === "observe" ? item.delta.count : null,
     })),
+    ...rateDeltaLines(report, comparison),
   ];
+}
+
+export function pageRateDeltas(
+  current: AnalyticsReport,
+  baseline: AnalyticsReport,
+): { readonly path: string; readonly delta: ReturnType<typeof rateDifference> }[] {
+  const paths = new Set<string>([...current.pageRates.map((row) => row.path), ...baseline.pageRates.map((row) => row.path)]);
+  return [...paths].sort().map((path) => ({
+    path,
+    delta: rateDifference(
+      current.pageRates.find((row) => row.path === path)?.rate,
+      baseline.pageRates.find((row) => row.path === path)?.rate,
+    ),
+  }));
+}
+
+function rateDeltaLines(current: AnalyticsReport, baseline: AnalyticsReport): TotalLine[] {
+  return pageRateDeltas(current, baseline).map((item) => ({
+    kind: "ecart_rate" as const,
+    name: item.path,
+    state: item.delta.state,
+    count: null,
+    ratio: item.delta.state === "observe" ? item.delta.text : null,
+  }));
 }
 
 export function totalsSignature(report: AnalyticsReport): string {
@@ -256,6 +369,7 @@ export function renderAnalyticsJson(report: AnalyticsReport, comparison?: Analyt
     totals: totalsObject(report),
     pages: report.pages,
     conversions: report.conversions,
+    page_rates: report.pageRates,
     ...(comparison ? {
       comparison: {
         from: comparison.from,
@@ -263,8 +377,14 @@ export function renderAnalyticsJson(report: AnalyticsReport, comparison?: Analyt
         totals: totalsObject(comparison),
         pages: comparison.pages,
         conversions: comparison.conversions,
+        page_rates: comparison.pageRates,
       },
       ecarts: Object.fromEntries(reportDeltas(report, comparison).map((item) => [item.name, item.delta])),
+      rate_ecarts: rateDeltaLines(report, comparison).map((line) => ({
+        path: line.name,
+        state: line.state,
+        ...(line.state === "observe" ? { text: line.ratio } : {}),
+      })),
     } : {}),
     not_collected: report.notCollected,
     signature: exportSignature(report, comparison),
@@ -274,7 +394,10 @@ export function renderAnalyticsJson(report: AnalyticsReport, comparison?: Analyt
 export function renderAnalyticsCsv(report: AnalyticsReport, comparison?: AnalyticsReport): string {
   const rows = ["kind,name,state,count"];
   for (const line of exportLines(report, comparison)) {
-    rows.push(`${line.kind},${line.name},${line.state},${line.count === null ? "" : String(line.count)}`);
+    const value = line.kind === "rate" || line.kind === "compare_rate" || line.kind === "ecart_rate"
+      ? (line.state === "observe" ? (line.ratio ?? "") : "")
+      : (line.count === null ? "" : String(line.count));
+    rows.push(`${line.kind},${line.name},${line.state},${value}`);
   }
   return `${rows.join("\n")}\n`;
 }
@@ -393,7 +516,7 @@ export function renderAnalyticsPdf(report: AnalyticsReport, comparison?: Analyti
     "fuseau America/Toronto",
     ...signatureLines.slice(0, primaryCount),
     ...(comparison ? [`comparaison ${comparison.from} ${comparison.to}`, ...signatureLines.slice(primaryCount)] : []),
-    "non collecte Search Console taux par page",
+    "non collecte Search Console",
   ];
   const commands = ["BT", "/F1 11 Tf", "72 740 Td"];
   lines.forEach((line, index) => {
@@ -445,5 +568,5 @@ export function signatureFromCsv(csv: string): string {
 
 export function signatureFromPdf(pdf: string): string {
   const matches = [...pdf.matchAll(/\(([^)]*)\) Tj/g)].map((match) => match[1] ?? "");
-  return matches.filter((line) => /^(total|page|funnel|compare_page|compare_funnel|compare|ecart) /.test(line)).join("\n");
+  return matches.filter((line) => /^(total|page|funnel|compare_page|compare_funnel|compare_rate|compare|ecart_rate|ecart|rate) /.test(line)).join("\n");
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, unauthorized } from "next/navigation";
-import { NOT_COLLECTED, reportDeltas, type MeasureName } from "@/domain/analytics-report";
+import { NOT_COLLECTED, pageRateDeltas, reportDeltas, type MeasureName, type PageRate } from "@/domain/analytics-report";
 import { canReadAnalytics, loadAnalyticsReport } from "@/server/analytics";
 import { readLiveAdmin } from "@/server/current-admin";
 import { settingsDatabase } from "@/server/public-site";
@@ -39,6 +39,10 @@ function countLabel(name: MeasureName, measure: { state: "observe"; count: numbe
 
 function deltaText(delta: { state: "observe"; count: number } | { state: "trou" }): string {
   return delta.state === "observe" ? String(delta.count) : "Trou — une des deux périodes n'a pas de mesure. Ce n'est pas un écart depuis zéro.";
+}
+
+function rateText(row: PageRate): string {
+  return row.rate.state === "observe" ? row.rate.text : "Trou — aucune vue mesurée de ce chemin. Ce n'est pas une division par zéro.";
 }
 
 export default async function AnalyticsPage({
@@ -110,12 +114,28 @@ export default async function AnalyticsPage({
               <p>Temps engagé : {countLabel("engaged_seconds", comparison.engagedSeconds)}</p>
               <p>Retours : {countLabel("returns", comparison.returns)}</p>
               <p>Demandes : {measureText(comparison.leads)}</p>
+              {comparison.pageRates.length === 0 ? (
+                <p>Taux : trou — aucun parcours connu sur cette période.</p>
+              ) : (
+                <ul className="plain-list">
+                  {comparison.pageRates.map((row) => (
+                    <li key={row.path}>
+                      Taux {row.path} — {rateText(row)}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <h2>Écarts</h2>
               <p>Période choisie moins période comparée.</p>
               <ul className="plain-list">
                 {reportDeltas(report, comparison).map((item) => (
                   <li key={item.name}>
                     {TOTALS.find((total) => total.name === item.name)?.label} : {deltaText(item.delta)}
+                  </li>
+                ))}
+                {pageRateDeltas(report, comparison).map((item) => (
+                  <li key={item.path}>
+                    Taux {item.path} : {item.delta.state === "observe" ? item.delta.text : "Trou — une des deux périodes n'a pas de taux mesuré. Ce n'est pas un écart depuis zéro."}
                   </li>
                 ))}
               </ul>
@@ -134,7 +154,6 @@ export default async function AnalyticsPage({
             </ul>
           )}
           <h2>Conversions</h2>
-          <p>Le taux par page est un trou : une demande n&apos;enregistre pas la page d&apos;origine.</p>
           {report.conversions.state === "trou" ? (
             <p>Trou — aucune demande enregistrée dans cette période.</p>
           ) : (
@@ -142,6 +161,19 @@ export default async function AnalyticsPage({
               {report.conversions.rows.map((row) => (
                 <li key={row.funnel}>
                   {row.funnel} — {row.leads}
+                </li>
+              ))}
+            </ul>
+          )}
+          <h2>Taux par page</h2>
+          <p>Le taux est les demandes d&apos;un parcours divisées par les vues de son chemin connu. Une page sans parcours n&apos;a pas de taux.</p>
+          {report.pageRates.length === 0 ? (
+            <p>Trou — aucun parcours connu n&apos;a de vue ni de demande dans cette période.</p>
+          ) : (
+            <ul className="plain-list">
+              {report.pageRates.map((row) => (
+                <li key={row.path}>
+                  {row.path} — {rateText(row)}
                 </li>
               ))}
             </ul>
