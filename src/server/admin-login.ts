@@ -55,17 +55,21 @@ export function renderLoginDocument(input: { failed: boolean; email: string; not
   <meta name="robots" content="noindex, nofollow">
   <title>Connexion — Maisons Québec</title>
   <style>
-    body { margin: 0; background: #f3efe6; color: #1b2421; font-family: "Segoe UI", sans-serif; }
-    main { max-width: 28rem; margin: 0 auto; padding: 3rem 1.25rem; }
-    h1 { font-family: Georgia, serif; font-size: 2rem; line-height: 1.15; }
-    label { display: grid; gap: 0.35rem; font-weight: 650; margin: 0 0 0.9rem; }
-    input { font: inherit; padding: 0.6rem 0.7rem; border: 1px solid #d9d0c0; border-radius: 0.6rem; }
-    button { font: inherit; font-weight: 700; background: #16342c; color: #f6f1e7; border: 0; border-radius: 999px; padding: 0.7rem 1.1rem; }
+    body { margin: 0; min-height: 100vh; background: #e7efe9; color: #1b2421; font-family: "Segoe UI", sans-serif; }
+    header { background: #143129; color: #f6f1e7; border-bottom: 3px solid #e7c27a; }
+    header p { max-width: 72rem; margin: 0 auto; padding: 1rem; font-family: Georgia, serif; font-size: 1.4rem; }
+    main { max-width: 32rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    form { background: #fffdf8; border: 1px solid #d8cfbf; border-radius: 1.2rem; padding: 1.2rem; box-shadow: 0 18px 40px rgb(12 34 28 / 8%); }
+    h1 { font-family: Georgia, serif; font-weight: 500; font-size: clamp(1.8rem, 6vw, 2.2rem); line-height: 1.15; }
+    label { display: grid; gap: 0.35rem; font-weight: 700; margin: 0 0 0.9rem; }
+    input { width: 100%; font: inherit; font-size: 1rem; padding: 0.7rem 0.75rem; border: 1px solid #d8cfbf; border-radius: 0.7rem; }
+    button { font: inherit; font-weight: 700; background: #143129; color: #f6f1e7; border: 0; border-radius: 999px; min-height: 2.75rem; padding: 0.75rem 1.15rem; }
     a { color: #0f4c3a; }
-    p { line-height: 1.5; }
+    p { line-height: 1.55; }
   </style>
 </head>
 <body>
+  <header><p>Maisons Québec</p></header>
   <main>
     <h1>Connexion à l'administration</h1>
     <p>Le premier propriétaire est créé seulement par le compte d'amorçage, à la première connexion valide. Les autres comptes sont enregistrés dans la base locale.</p>

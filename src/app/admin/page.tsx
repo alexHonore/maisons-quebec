@@ -31,7 +31,7 @@ export default async function AdminPage() {
         Session reconnue pour {user.email}. Rôle lu dans la base : {ADMIN_ROLE_LABELS[user.role]}. {totpText}
       </p>
       <p>Le catalogue ne liste que les événements réellement émis. Un rendez-vous demandé se confirme depuis les demandes, seulement avec un créneau réel.</p>
-      <ul className="nav">
+      <ul className="admin-menu">
         {roleCan(user.role, "settings.copy.write") || roleCan(user.role, "settings.regulatory.write") ? (
           <li>
             <Link href="/admin/settings">Réglages du site</Link>

@@ -62,6 +62,7 @@ export function PublicFrame({ content, children }: { content: HomeContent; child
       </section>
       <footer className="site-footer">
         <div className="wrap">
+          <span className="brand-name">{content.brand}</span>
           <ul>
             {content.footer.map((line) => (
               <li key={line}>{line}</li>

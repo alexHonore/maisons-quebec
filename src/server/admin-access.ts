@@ -247,14 +247,17 @@ export function renderAdminRefusalDocument(): string {
   <title>${copy.title}</title>
   <style>
     :root { color-scheme: light; }
-    body { margin: 0; font-family: Georgia, "Iowan Old Style", serif; background: #f3efe6; color: #1b2421; }
-    main { max-width: 38rem; margin: 0 auto; padding: 4rem 1.25rem; }
-    h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 1rem; }
-    p { line-height: 1.5; font-family: "Segoe UI", sans-serif; }
+    body { margin: 0; min-height: 100vh; background: #e7efe9; color: #1b2421; font-family: "Segoe UI", sans-serif; }
+    header { background: #143129; color: #f6f1e7; border-bottom: 3px solid #e7c27a; }
+    header p { max-width: 72rem; margin: 0 auto; padding: 1rem; font-family: Georgia, serif; font-size: 1.4rem; }
+    main { max-width: 38rem; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    h1 { font-family: Georgia, serif; font-weight: 500; font-size: clamp(1.8rem, 5vw, 2.2rem); line-height: 1.15; margin: 0 0 1rem; }
+    p { line-height: 1.55; }
     a { color: #0f4c3a; }
   </style>
 </head>
 <body>
+  <header><p>Maisons Québec</p></header>
   <main>
     <h1>${copy.title}</h1>
     <p>${copy.lead}</p>
