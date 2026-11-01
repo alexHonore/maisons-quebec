@@ -5,16 +5,19 @@ import {
   chartBarLength,
   chartTotalsFromCsv,
   chartTotalsFromJson,
+  exportSignature,
   periodBounds,
   readChart,
   renderAnalyticsCsv,
   renderAnalyticsJson,
   renderAnalyticsPdf,
+  reportDeltas,
   signatureFromCsv,
   signatureFromJson,
   signatureFromPdf,
   torontoDayStartUtc,
   totalsSignature,
+  totalDelta,
   type AnalyticsReport,
 } from "./analytics-report";
 
@@ -151,5 +154,72 @@ describe("rapport d'analytique", () => {
     assert.equal(chart.find((item) => item.name === "returns")?.count, 1);
     assert.equal(chart.find((item) => item.name === "sessions")?.bar, null);
     assert.equal(chart.find((item) => item.name === "leads")?.bar, null);
+  });
+
+  it("n'affiche un écart que lorsque les deux périodes ont une mesure", () => {
+    const visitor = "11111111-1111-4111-8111-111111111111";
+    const chosen = buildAnalyticsReport({
+      from: "2026-07-15",
+      to: "2026-07-15",
+      pageViews: [
+        { path: "/", occurredAt: "2026-07-15T16:00:00.000Z", visitorId: visitor },
+        { path: "/vendre", occurredAt: "2026-07-15T18:00:00.000Z", visitorId: visitor },
+      ],
+      sessions: [{ startedAt: "2026-07-15T16:00:00.000Z" }],
+      engagedSeconds: [{ seconds: 7, occurredAt: "2026-07-15T16:00:00.000Z" }],
+      leads: [{ funnelName: "produit_net", createdAt: "2026-07-15T17:00:00.000Z" }],
+    });
+    const baseline = buildAnalyticsReport({
+      from: "2026-07-16",
+      to: "2026-07-16",
+      pageViews: [{ path: "/", occurredAt: "2026-07-16T16:00:00.000Z", visitorId: visitor }],
+      sessions: [{ startedAt: "2026-07-16T16:00:00.000Z" }],
+      engagedSeconds: [],
+      leads: [],
+    });
+    const empty = buildAnalyticsReport({
+      from: "2026-08-01",
+      to: "2026-08-01",
+      pageViews: [],
+      sessions: [],
+      engagedSeconds: [],
+      leads: [],
+    });
+    assert.ok(chosen && baseline && empty);
+    if (!chosen || !baseline || !empty) return;
+    assert.deepEqual(totalDelta({ state: "observe", count: 7 }, { state: "trou" }), { state: "trou" });
+    assert.deepEqual(totalDelta({ state: "observe", count: 0 }, { state: "observe", count: 2 }), { state: "observe", count: -2 });
+    const deltas = Object.fromEntries(reportDeltas(chosen, baseline).map((item) => [item.name, item.delta]));
+    assert.deepEqual(deltas.page_views, { state: "observe", count: 1 });
+    assert.deepEqual(deltas.sessions, { state: "observe", count: 0 });
+    assert.deepEqual(deltas.unique_visitors, { state: "observe", count: 0 });
+    assert.deepEqual(deltas.returns, { state: "observe", count: 0 });
+    assert.deepEqual(deltas.engaged_seconds, { state: "trou" });
+    assert.deepEqual(deltas.leads, { state: "trou" });
+    const signature = exportSignature(chosen, baseline);
+    assert.equal(signature.includes("ecart engaged_seconds observe"), false);
+    assert.equal(signature.includes("ecart leads observe"), false);
+    assert.equal(signature.includes("ecart sessions observe 0"), true);
+    const json = renderAnalyticsJson(chosen, baseline);
+    const csv = renderAnalyticsCsv(chosen, baseline);
+    const pdf = renderAnalyticsPdf(chosen, baseline);
+    assert.equal(signatureFromJson(json), signature);
+    assert.equal(signatureFromCsv(csv), signature);
+    assert.equal(signatureFromPdf(pdf), signature);
+    assert.equal(json.includes("2026-07-16"), true);
+    assert.equal(csv.includes("compare,page_views,observe,1"), true);
+    assertChartMatchesExports(chosen);
+    const chart = readChart(pdf);
+    assert.equal(chart.length, 6);
+    assert.equal(chart.find((item) => item.name === "engaged_seconds")?.bar === null, false);
+    assert.equal((pdf.match(/10 re/g) ?? []).length, 6);
+    const againstHole = exportSignature(chosen, empty);
+    assert.equal(againstHole.includes("ecart page_views observe"), false);
+    assert.equal(againstHole.includes("ecart engaged_seconds observe"), false);
+    const bothHoles = exportSignature(empty, empty);
+    assert.equal(bothHoles.includes(" 0"), false);
+    assert.equal(signatureFromPdf(renderAnalyticsPdf(empty, empty)), bothHoles);
+    assert.equal(signatureFromCsv(renderAnalyticsCsv(empty, empty)), bothHoles);
+    assert.equal(signatureFromJson(renderAnalyticsJson(empty, empty)), bothHoles);
   });
 });

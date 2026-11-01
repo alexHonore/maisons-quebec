@@ -154,7 +154,32 @@ export function buildAnalyticsReport(input: {
   };
 }
 
-export type TotalLine = { readonly kind: "total" | "page" | "funnel"; readonly name: string; readonly state: "observe" | "trou"; readonly count: number | null };
+export type TotalLine = {
+  readonly kind: "total" | "page" | "funnel" | "compare" | "compare_page" | "compare_funnel" | "ecart";
+  readonly name: string;
+  readonly state: "observe" | "trou";
+  readonly count: number | null;
+};
+
+const MEASURES = [
+  ["pageViews", "page_views"],
+  ["sessions", "sessions"],
+  ["uniqueVisitors", "unique_visitors"],
+  ["engagedSeconds", "engaged_seconds"],
+  ["returns", "returns"],
+  ["leads", "leads"],
+] as const;
+
+export type MeasureName = (typeof MEASURES)[number][1];
+
+export function totalDelta(current: ObservedCount | Gap, baseline: ObservedCount | Gap): ObservedCount | Gap {
+  if (current.state !== "observe" || baseline.state !== "observe") return { state: "trou" };
+  return { state: "observe", count: current.count - baseline.count };
+}
+
+export function reportDeltas(current: AnalyticsReport, baseline: AnalyticsReport): { readonly name: MeasureName; readonly delta: ObservedCount | Gap }[] {
+  return MEASURES.map(([key, name]) => ({ name, delta: totalDelta(current[key], baseline[key]) }));
+}
 
 export function reportTotalLines(report: AnalyticsReport): TotalLine[] {
   const lines: TotalLine[] = [
@@ -178,36 +203,77 @@ export function reportTotalLines(report: AnalyticsReport): TotalLine[] {
   return lines;
 }
 
-export function totalsSignature(report: AnalyticsReport): string {
-  return reportTotalLines(report)
-    .map((line) => `${line.kind} ${line.name} ${line.state} ${line.count === null ? "trou" : String(line.count)}`)
-    .join("\n");
+function lineText(line: TotalLine): string {
+  return `${line.kind} ${line.name} ${line.state} ${line.count === null ? "trou" : String(line.count)}`;
 }
 
-export function renderAnalyticsJson(report: AnalyticsReport): string {
+function renamedLines(lines: readonly TotalLine[], total: TotalLine["kind"], page: TotalLine["kind"], funnel: TotalLine["kind"]): TotalLine[] {
+  return lines.map((line) => ({
+    ...line,
+    kind: line.kind === "total" ? total : line.kind === "page" ? page : funnel,
+  }));
+}
+
+export function exportLines(report: AnalyticsReport, comparison?: AnalyticsReport): TotalLine[] {
+  if (!comparison) return reportTotalLines(report);
+  return [
+    ...reportTotalLines(report),
+    ...renamedLines(reportTotalLines(comparison), "compare", "compare_page", "compare_funnel"),
+    ...reportDeltas(report, comparison).map((item) => ({
+      kind: "ecart" as const,
+      name: item.name,
+      state: item.delta.state,
+      count: item.delta.state === "observe" ? item.delta.count : null,
+    })),
+  ];
+}
+
+export function totalsSignature(report: AnalyticsReport): string {
+  return reportTotalLines(report).map(lineText).join("\n");
+}
+
+export function exportSignature(report: AnalyticsReport, comparison?: AnalyticsReport): string {
+  return exportLines(report, comparison).map(lineText).join("\n");
+}
+
+function totalsObject(report: AnalyticsReport) {
+  return {
+    page_views: report.pageViews,
+    sessions: report.sessions,
+    unique_visitors: report.uniqueVisitors,
+    engaged_seconds: report.engagedSeconds,
+    returns: report.returns,
+    leads: report.leads,
+  };
+}
+
+export function renderAnalyticsJson(report: AnalyticsReport, comparison?: AnalyticsReport): string {
   return JSON.stringify({
     version: report.version,
     timezone: report.timezone,
     from: report.from,
     to: report.to,
-    totals: {
-      page_views: report.pageViews,
-      sessions: report.sessions,
-      unique_visitors: report.uniqueVisitors,
-      engaged_seconds: report.engagedSeconds,
-      returns: report.returns,
-      leads: report.leads,
-    },
+    totals: totalsObject(report),
     pages: report.pages,
     conversions: report.conversions,
+    ...(comparison ? {
+      comparison: {
+        from: comparison.from,
+        to: comparison.to,
+        totals: totalsObject(comparison),
+        pages: comparison.pages,
+        conversions: comparison.conversions,
+      },
+      ecarts: Object.fromEntries(reportDeltas(report, comparison).map((item) => [item.name, item.delta])),
+    } : {}),
     not_collected: report.notCollected,
-    signature: totalsSignature(report),
+    signature: exportSignature(report, comparison),
   });
 }
 
-export function renderAnalyticsCsv(report: AnalyticsReport): string {
+export function renderAnalyticsCsv(report: AnalyticsReport, comparison?: AnalyticsReport): string {
   const rows = ["kind,name,state,count"];
-  for (const line of reportTotalLines(report)) {
+  for (const line of exportLines(report, comparison)) {
     rows.push(`${line.kind},${line.name},${line.state},${line.count === null ? "" : String(line.count)}`);
   }
   return `${rows.join("\n")}\n`;
@@ -264,16 +330,16 @@ function chartCommands(report: AnalyticsReport): string[] {
   const commands = [
     "BT",
     "/F1 11 Tf",
-    "48 400 Td",
+    "48 220 Td",
     "(Graphique des totaux mesures : vues, sessions, visiteurs, secondes, retours, demandes) Tj",
     "ET",
-    "178 250 m",
-    "178 385 l",
+    "178 70 m",
+    "178 205 l",
     "S",
   ];
   chartRows(report).forEach((row, index) => {
     const label = CHART_LABELS[index]?.[1] ?? row.name;
-    const y = 370 - index * 22;
+    const y = 190 - index * 18;
     if (row.bar !== null) commands.push(`${178} ${y - 3} ${row.bar} 10 re`, "f");
     const value = row.state === "observe" ? `observe ${row.count}` : "trou";
     commands.push("BT", "/F1 9 Tf", `48 ${y} Td`, `(graphique ${label} ${value}) Tj`, "ET");
@@ -318,12 +384,15 @@ export function chartTotalsFromCsv(csv: string): Pick<ChartTotal, "name" | "stat
   });
 }
 
-export function renderAnalyticsPdf(report: AnalyticsReport): string {
+export function renderAnalyticsPdf(report: AnalyticsReport, comparison?: AnalyticsReport): string {
+  const signatureLines = exportSignature(report, comparison).split("\n");
+  const primaryCount = reportTotalLines(report).length;
   const lines = [
     "Maisons Quebec",
     `periode ${report.from} ${report.to}`,
     "fuseau America/Toronto",
-    ...totalsSignature(report).split("\n"),
+    ...signatureLines.slice(0, primaryCount),
+    ...(comparison ? [`comparaison ${comparison.from} ${comparison.to}`, ...signatureLines.slice(primaryCount)] : []),
     "non collecte Search Console taux par page",
   ];
   const commands = ["BT", "/F1 11 Tf", "72 740 Td"];
@@ -376,5 +445,5 @@ export function signatureFromCsv(csv: string): string {
 
 export function signatureFromPdf(pdf: string): string {
   const matches = [...pdf.matchAll(/\(([^)]*)\) Tj/g)].map((match) => match[1] ?? "");
-  return matches.filter((line) => /^(total|page|funnel) /.test(line)).join("\n");
+  return matches.filter((line) => /^(total|page|funnel|compare_page|compare_funnel|compare|ecart) /.test(line)).join("\n");
 }
