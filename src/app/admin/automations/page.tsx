@@ -25,6 +25,7 @@ const ERRORS: Record<string, string> = {
   invalid_name: "Le nom doit être un identifiant stable, sans script.",
   invalid_trigger: "Ce déclencheur n'est pas émis par le site.",
   invalid_action: "Cette action n'est pas permise.",
+  invalid_page: "Cette action exige le nom d'une page publiée.",
   invalid_document: "Ce JSON n'est pas une automatisation de cette tranche.",
   secret_present: "Le JSON contient un secret, une adresse ou un courriel. Rien n'a été enregistré.",
   missing: "Automatisation introuvable.",
@@ -51,8 +52,7 @@ export default async function AutomationsPage({
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Automatisations</h1>
       <p>
-        Déclencheurs limités aux événements déjà émis. Actions de cette tranche : remettre une livraison webhook en file, ou
-        écrire une tâche admin sans donnée personnelle. Pas de publication automatique.
+        Déclencheurs limités aux événements déjà émis. Actions : remettre une livraison webhook en file, écrire une tâche admin sans donnée personnelle, ou copier le corps d&apos;une page publiée vers un nouveau brouillon. Une action auto_publish est refusée. Le brouillon n&apos;est pas publié.
       </p>
       <h2>n8n</h2>
       {n8n.message === "à connecter" ? (
@@ -125,6 +125,10 @@ export default async function AutomationsPage({
                   ))}
                 </select>
               </label>
+              <label>
+                Page publiée
+                <input name="page" defaultValue={automation.page ?? ""} autoComplete="off" />
+              </label>
               <button type="submit">Enregistrer une nouvelle version</button>
             </form>
           </li>
@@ -156,10 +160,14 @@ export default async function AutomationsPage({
             ))}
           </select>
         </label>
+        <label>
+          Page publiée
+          <input name="page" autoComplete="off" />
+        </label>
         <button type="submit">Enregistrer</button>
       </form>
       <h2>Importer un JSON</h2>
-      <p>Le fichier accepté contient le nom, le déclencheur et l&apos;action. Un secret, une adresse ou un courriel est refusé. L&apos;import ajoute une version.</p>
+      <p>Le fichier accepté contient le nom, le déclencheur et l&apos;action. Pour ouvrir un brouillon, il nomme aussi la page. Une action auto_publish, un secret, une adresse ou un courriel est refusé. L&apos;import ajoute une version.</p>
       <form className="form-grid" action={importAutomationAction}>
         <label>
           JSON

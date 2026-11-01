@@ -15,6 +15,7 @@ import {
   type AutomationRunState,
 } from "../domain/automation";
 import { isNativeEventType, type NativeEventType } from "../domain/event-catalog";
+import { openDraftFromPublishedPage } from "./content-pages";
 import { enqueueJob } from "./job-queue";
 
 export type AutomationView = {
@@ -22,6 +23,7 @@ export type AutomationView = {
   readonly name: string;
   readonly trigger: string;
   readonly action: AutomationAction;
+  readonly page: string | null;
   readonly enabled: boolean;
   readonly versionNumber: number;
 };
@@ -42,13 +44,13 @@ export type AutomationRunView = {
 };
 
 function isRunState(value: string): value is AutomationRunState {
-  return value === "en_file" || value === "aucune_destination" || value === "tache_en_file";
+  return value === "en_file" || value === "aucune_destination" || value === "tache_en_file" || value === "brouillon_ouvert" || value === "page_introuvable";
 }
 
 export function saveAutomation(
   db: DatabaseSync,
-  input: { actorId: string; actorRole: AdminRole; name: string; trigger: string; action: string; now: Date },
-): { ok: true; id: string; versionNumber: number } | { ok: false; reason: "forbidden" | "invalid_name" | "invalid_trigger" | "invalid_action" } {
+  input: { actorId: string; actorRole: AdminRole; name: string; trigger: string; action: string; page?: string | null; now: Date },
+): { ok: true; id: string; versionNumber: number } | { ok: false; reason: "forbidden" | "invalid_name" | "invalid_trigger" | "invalid_action" | "invalid_page" } {
   if (!roleCan(input.actorRole, "automations.manage")) return { ok: false, reason: "forbidden" };
   const parsed = parseAutomation(input);
   if (!parsed.ok) return parsed;
@@ -59,21 +61,22 @@ export function saveAutomation(
   const versionNumber = Number(current?.total ?? 0) + 1;
   if (!existing) {
     db.prepare(
-      `INSERT INTO automations (id, name, trigger_event, action_kind, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-    ).run(id, parsed.definition.name, parsed.definition.trigger, parsed.definition.action, now, now);
+      `INSERT INTO automations (id, name, trigger_event, action_kind, page_slug, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+    ).run(id, parsed.definition.name, parsed.definition.trigger, parsed.definition.action, parsed.definition.page, now, now);
   } else {
-    db.prepare("UPDATE automations SET trigger_event = ?, action_kind = ?, updated_at = ? WHERE id = ?").run(
+    db.prepare("UPDATE automations SET trigger_event = ?, action_kind = ?, page_slug = ?, updated_at = ? WHERE id = ?").run(
       parsed.definition.trigger,
       parsed.definition.action,
+      parsed.definition.page,
       now,
       id,
     );
   }
   db.prepare(
-    `INSERT INTO automation_versions (id, automation_id, version_number, trigger_event, action_kind, created_at, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(randomUUID(), id, versionNumber, parsed.definition.trigger, parsed.definition.action, now, input.actorId);
+    `INSERT INTO automation_versions (id, automation_id, version_number, trigger_event, action_kind, page_slug, created_at, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), id, versionNumber, parsed.definition.trigger, parsed.definition.action, parsed.definition.page, now, input.actorId);
   recordAdminAudit(db, {
     actorId: input.actorId,
     actorRole: input.actorRole,
@@ -108,7 +111,7 @@ export function setAutomationEnabled(
 export function listAutomations(db: DatabaseSync): AutomationView[] {
   return db
     .prepare(
-      `SELECT automations.id, automations.name, automations.trigger_event, automations.action_kind, automations.enabled,
+      `SELECT automations.id, automations.name, automations.trigger_event, automations.action_kind, automations.page_slug, automations.enabled,
               COALESCE(MAX(automation_versions.version_number), 0) AS version_number
        FROM automations
        LEFT JOIN automation_versions ON automation_versions.automation_id = automations.id
@@ -124,6 +127,7 @@ export function listAutomations(db: DatabaseSync): AutomationView[] {
         name: String(row.name),
         trigger: String(row.trigger_event),
         action,
+        page: row.page_slug === null || row.page_slug === undefined || String(row.page_slug) === "" ? null : String(row.page_slug),
         enabled: Number(row.enabled) === 1,
         versionNumber: Number(row.version_number),
       };
@@ -202,7 +206,7 @@ export function runMatchingAutomations(
 ): void {
   if (!isNativeEventType(input.trigger)) return;
   const rows = db
-    .prepare("SELECT id, action_kind FROM automations WHERE enabled = 1 AND trigger_event = ?")
+    .prepare("SELECT id, action_kind, page_slug FROM automations WHERE enabled = 1 AND trigger_event = ?")
     .all(input.trigger);
   for (const row of rows) {
     const action = String(row.action_kind);
@@ -241,6 +245,20 @@ export function runMatchingAutomations(
       });
       continue;
     }
+    if (action === "content.open_draft") {
+      const opened = openDraftFromPublishedPage(db, { slug: String(row.page_slug ?? ""), now: new Date(input.occurredAt) });
+      recordRun(db, {
+        automationId,
+        versionNumber,
+        sourceEventId: input.sourceEventId,
+        trigger: input.trigger,
+        action,
+        state: opened.ok ? "brouillon_ouvert" : "page_introuvable",
+        subjectId: opened.ok ? opened.id : null,
+        occurredAt: input.occurredAt,
+      });
+      continue;
+    }
     const job = enqueueJob(db, {
       jobName: AUTOMATION_TASK_NAME,
       actorId: automationId,
@@ -260,13 +278,14 @@ export function runMatchingAutomations(
   }
 }
 
-function readDefinition(db: DatabaseSync, id: string): { name: string; trigger: string; action: string; enabled: boolean } | null {
-  const row = db.prepare("SELECT name, trigger_event, action_kind, enabled FROM automations WHERE id = ?").get(id);
+function readDefinition(db: DatabaseSync, id: string): { name: string; trigger: string; action: string; page: string | null; enabled: boolean } | null {
+  const row = db.prepare("SELECT name, trigger_event, action_kind, page_slug, enabled FROM automations WHERE id = ?").get(id);
   if (!row) return null;
   return {
     name: String(row.name),
     trigger: String(row.trigger_event),
     action: String(row.action_kind),
+    page: row.page_slug === null || row.page_slug === undefined || String(row.page_slug) === "" ? null : String(row.page_slug),
     enabled: Number(row.enabled) === 1,
   };
 }
@@ -285,6 +304,7 @@ export function exportAutomationJson(
     name: parsed.definition.name,
     trigger: parsed.definition.trigger,
     action: parsed.definition.action,
+    page: parsed.definition.page,
   };
   return { ok: true, filename: `automatisation-${document.name}.json`, body: renderAutomationJson(document) };
 }
@@ -302,6 +322,7 @@ export function importAutomationJson(
     name: parsed.document.name,
     trigger: parsed.document.trigger,
     action: parsed.document.action,
+    page: parsed.document.page,
     now: input.now,
   });
 }
@@ -309,7 +330,7 @@ export function importAutomationJson(
 export function previewAutomation(
   db: DatabaseSync,
   input: { actorRole: AdminRole; id: string },
-): { ok: true; summary: string; requeuedWebhook: false; createdTask: false } | { ok: false; reason: "forbidden" | "missing" } {
+): { ok: true; summary: string; requeuedWebhook: false; createdTask: false; openedDraft: false } | { ok: false; reason: "forbidden" | "missing" } {
   if (!roleCan(input.actorRole, "automations.manage")) return { ok: false, reason: "forbidden" };
   const current = readDefinition(db, input.id);
   if (!current) return { ok: false, reason: "missing" };
@@ -319,5 +340,5 @@ export function previewAutomation(
   const summary = current.enabled
     ? preview.summary
     : `Définition inactive. L'essai ne l'active pas. ${preview.summary}`;
-  return { ok: true, summary, requeuedWebhook: false, createdTask: false };
+  return { ok: true, summary, requeuedWebhook: false, createdTask: false, openedDraft: false };
 }

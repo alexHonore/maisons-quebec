@@ -11,6 +11,10 @@ describe("définitions d'automatisation", () => {
     assert.equal(parseAutomation({ name: "publication", trigger: "lead.created", action: "content.publish" }).ok, false);
     assert.equal(parseAutomation({ name: "javascript_alert", trigger: "lead.created", action: "admin.task" }).ok, false);
     assert.equal(parseAutomation({ name: "personne@example.com", trigger: "lead.created", action: "admin.task" }).ok, false);
+    assert.equal(parseAutomation({ name: "ouvrir_note", trigger: "lead.created", action: "content.open_draft", page: "lire-une-methode" }).ok, true);
+    assert.equal(parseAutomation({ name: "ouvrir_note", trigger: "lead.created", action: "content.open_draft" }).ok, false);
+    assert.equal(parseAutomation({ name: "ouvrir_note", trigger: "lead.created", action: "auto_publish" }).ok, false);
+    assert.equal(parseAutomation({ name: "ouvrir_note", trigger: "lead.created", action: "content.auto_publish" }).ok, false);
   });
 
   it("n'appelle pas n8n quand l'adresse est vide, et ne réussit pas quand elle est présente", async () => {
@@ -35,6 +39,7 @@ describe("définitions d'automatisation", () => {
       name: parsed.definition.name,
       trigger: parsed.definition.trigger,
       action: parsed.definition.action,
+      page: parsed.definition.page,
     });
     assert.deepEqual(Object.keys(JSON.parse(body)), ["schema_version", "name", "trigger", "action"]);
     const same = parseAutomationDocument(body);
@@ -72,7 +77,30 @@ describe("définitions d'automatisation", () => {
     assert.equal(preview.executed, false);
     assert.equal(preview.requeuedWebhook, false);
     assert.equal(preview.createdTask, false);
+    assert.equal(preview.openedDraft, false);
     assert.match(preview.summary, /Aucune livraison n'a été remise en file/);
     assert.match(preview.summary, /Aucune tâche n'a été créée/);
+    assert.match(preview.summary, /Aucun brouillon n'a été créé/);
+    const opened = parseAutomationDocument(JSON.stringify({
+      schema_version: "1.0",
+      name: "ouvrir_note",
+      trigger: "lead.created",
+      action: "content.open_draft",
+      page: "lire-une-methode",
+    }));
+    assert.equal(opened.ok, true);
+    assert.deepEqual(parseAutomationDocument(JSON.stringify({
+      schema_version: "1.0",
+      name: "ouvrir_note",
+      trigger: "lead.created",
+      action: "auto_publish",
+    })), { ok: false, reason: "invalid_action" });
+    assert.deepEqual(parseAutomationDocument(JSON.stringify({
+      schema_version: "1.0",
+      name: "ouvrir_note",
+      trigger: "lead.created",
+      action: "content.auto_publish",
+      page: "lire-une-methode",
+    })), { ok: false, reason: "invalid_action" });
   });
 });

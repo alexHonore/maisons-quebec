@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
 import { DatabaseSync } from "node:sqlite";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ContentArticle } from "../components/content-article";
+import { MIN_INDEXABLE_BODY_LENGTH } from "../domain/content-page";
 import { auditPlainText } from "./admin-audit";
 import {
   captureLead,
@@ -16,9 +21,11 @@ import {
   listAutomationRuns,
   listAutomationVersions,
   previewAutomation,
+  runMatchingAutomations,
   saveAutomation,
   setAutomationEnabled,
 } from "./automations";
+import { readPublicContentPage, saveContentDraft, setContentPublished } from "./content-pages";
 import { listQueueJobs } from "./job-queue";
 import { migrateUp } from "./settings-db";
 
@@ -400,6 +407,80 @@ describe("automatisations", () => {
     assert.equal(Number(db.prepare("SELECT COUNT(*) AS total FROM webhook_attempts").get()?.total ?? 0), attemptsBefore);
     assert.equal(String(db.prepare("SELECT status FROM lead_outbox WHERE event_type = 'lead.created'").get()?.status), outboxBefore);
     assert.equal(db.prepare("SELECT enabled FROM automations WHERE id = ?").get(task.id)?.enabled, 0);
+    db.close();
+  });
+
+  it("copie le corps publié vers un brouillon sans changer le HTML public", () => {
+    const db = freshDb();
+    let body = "";
+    while (body.length < MIN_INDEXABLE_BODY_LENGTH) {
+      body += "Cette page explique une méthode de lecture. Elle ne donne aucun prix et aucune statistique. ";
+    }
+    const saved = saveContentDraft(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      slug: "lire-une-methode",
+      title: "Lire une méthode",
+      description: "Cette description présente une méthode de lecture, sans chiffre de marché.",
+      body: `${body.trim()}\n\nCette méthode ne constitue pas un prix de marché. Elle concerne une personne qui veut vendre à Québec. Voir /vendre/calculateur-produit-net.`,
+      sourceNote: "Note de méthode rédigée pour Maisons Québec.",
+      example: false,
+      now,
+    });
+    assert.equal(saved.ok, true);
+    if (!saved.ok) return;
+    assert.equal(setContentPublished(db, { actorId: "owner-1", actorRole: "owner", id: saved.id, published: true, now }).ok, true);
+    const liveBefore = readPublicContentPage(db, "lire-une-methode");
+    assert.ok(liveBefore);
+    if (!liveBefore) return;
+    const htmlBefore = renderToStaticMarkup(createElement(ContentArticle, { page: liveBefore, preview: false }));
+    const pagesBefore = Number(db.prepare("SELECT COUNT(*) AS total FROM content_pages").get()?.total ?? 0);
+    assert.deepEqual(importAutomationJson(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      body: JSON.stringify({ schema_version: "1.0", name: "pub_auto", trigger: "lead.created", action: "auto_publish" }),
+      now,
+    }), { ok: false, reason: "invalid_action" });
+    assert.deepEqual(importAutomationJson(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      body: JSON.stringify({ schema_version: "1.0", name: "pub_auto", trigger: "lead.created", action: "content.auto_publish", page: "lire-une-methode" }),
+      now,
+    }), { ok: false, reason: "invalid_action" });
+    const imported = importAutomationJson(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      body: JSON.stringify({
+        schema_version: "1.0",
+        name: "ouvrir_note",
+        trigger: "lead.created",
+        action: "content.open_draft",
+        page: "lire-une-methode",
+      }),
+      now,
+    });
+    assert.equal(imported.ok, true);
+    if (!imported.ok) return;
+    const preview = previewAutomation(db, { actorRole: "owner", id: imported.id });
+    assert.equal(preview.ok, true);
+    if (!preview.ok) return;
+    assert.equal(preview.openedDraft, false);
+    assert.match(preview.summary, /Aucun brouillon n'a été créé/);
+    assert.equal(Number(db.prepare("SELECT COUNT(*) AS total FROM content_pages").get()?.total ?? 0), pagesBefore);
+    runMatchingAutomations(db, { trigger: "lead.created", sourceEventId: randomUUID(), occurredAt: now.toISOString() });
+    const liveAfter = readPublicContentPage(db, "lire-une-methode");
+    assert.ok(liveAfter);
+    if (!liveAfter) return;
+    const htmlAfter = renderToStaticMarkup(createElement(ContentArticle, { page: liveAfter, preview: false }));
+    assert.equal(htmlAfter, htmlBefore);
+    assert.equal(liveAfter.body, liveBefore.body);
+    assert.equal(liveAfter.status, "published");
+    const draft = db.prepare("SELECT slug, body, status FROM content_pages WHERE id != ?").get(saved.id);
+    assert.equal(String(draft?.status), "draft");
+    assert.equal(String(draft?.body), liveBefore.body);
+    assert.notEqual(String(draft?.slug), "lire-une-methode");
+    assert.equal(readPublicContentPage(db, String(draft?.slug)), null);
+    assert.equal(db.prepare("SELECT state FROM automation_runs WHERE action_kind = 'content.open_draft'").get()?.state, "brouillon_ouvert");
     db.close();
   });
 });

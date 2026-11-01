@@ -384,6 +384,68 @@ export const MIGRATIONS = [
     up: "ALTER TABLE media_assets ADD COLUMN file_ext TEXT;",
     down: "ALTER TABLE media_assets DROP COLUMN file_ext;",
   },
+  {
+    version: "019_open_draft",
+    up: `
+      ALTER TABLE automation_versions ADD COLUMN page_slug TEXT;
+      ALTER TABLE automations ADD COLUMN page_slug TEXT;
+      CREATE TABLE automations_019 (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        trigger_event TEXT NOT NULL CHECK (trigger_event IN ('lead.created', 'appointment.requested', 'appointment.confirmed')),
+        action_kind TEXT NOT NULL CHECK (action_kind IN ('webhook.requeue', 'admin.task', 'content.open_draft')),
+        page_slug TEXT,
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      REPLACE INTO automations_019 (id, name, trigger_event, action_kind, page_slug, enabled, created_at, updated_at)
+        SELECT id, name, trigger_event, action_kind, page_slug, enabled, created_at, updated_at FROM automations;
+      DROP TABLE automations;
+      ALTER TABLE automations_019 RENAME TO automations;
+      CREATE TABLE automation_runs_019 (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        source_event_id TEXT NOT NULL,
+        trigger_event TEXT NOT NULL,
+        action_kind TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('en_file', 'aucune_destination', 'tache_en_file', 'brouillon_ouvert', 'page_introuvable')),
+        subject_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      REPLACE INTO automation_runs_019
+        SELECT id, automation_id, version_number, source_event_id, trigger_event, action_kind, state, subject_id, created_at
+        FROM automation_runs;
+      DROP TABLE automation_runs;
+      ALTER TABLE automation_runs_019 RENAME TO automation_runs;
+    `,
+    down: `
+      DROP TABLE IF EXISTS automations;
+      CREATE TABLE automations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        trigger_event TEXT NOT NULL CHECK (trigger_event IN ('lead.created', 'appointment.requested', 'appointment.confirmed')),
+        action_kind TEXT NOT NULL CHECK (action_kind IN ('webhook.requeue', 'admin.task')),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      DROP TABLE IF EXISTS automation_runs;
+      CREATE TABLE automation_runs (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        source_event_id TEXT NOT NULL,
+        trigger_event TEXT NOT NULL,
+        action_kind TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('en_file', 'aucune_destination', 'tache_en_file')),
+        subject_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      ALTER TABLE automation_versions DROP COLUMN page_slug;
+    `,
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {

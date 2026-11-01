@@ -17,6 +17,7 @@ export async function saveAutomationAction(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     trigger: String(formData.get("trigger") ?? ""),
     action: String(formData.get("action") ?? ""),
+    page: String(formData.get("page") ?? ""),
     now: new Date(),
   });
   redirect(result.ok ? "/admin/automations?enregistre=1" : `/admin/automations?erreur=${result.reason}`);

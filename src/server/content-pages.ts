@@ -280,6 +280,47 @@ export function readContentForPreview(
   return { ok: true, page: mapRow(row) };
 }
 
+function nextDraftSlug(db: DatabaseSync, publishedSlug: string): string | null {
+  const stem = `${publishedSlug}-brouillon`;
+  for (let index = 0; index < 20; index += 1) {
+    const suffix = index === 0 ? "" : `-${index + 1}`;
+    const candidate = `${stem.slice(0, 60 - suffix.length)}${suffix}`;
+    if (candidate.length < 3) continue;
+    const taken = db.prepare("SELECT id FROM content_pages WHERE slug = ?").get(candidate);
+    if (!taken) return candidate;
+  }
+  return null;
+}
+
+/** Copie le corps publié vers un nouveau brouillon. Ne modifie pas la page publique. */
+export function openDraftFromPublishedPage(
+  db: DatabaseSync,
+  input: { slug: string; now: Date },
+): { ok: true; id: string } | { ok: false; reason: "missing" } {
+  const row = db.prepare(`${ROW_SQL} WHERE slug = ? AND status = 'published'`).get(input.slug);
+  if (!row) return { ok: false, reason: "missing" };
+  const slug = nextDraftSlug(db, String(row.slug));
+  if (!slug) return { ok: false, reason: "missing" };
+  const now = input.now.toISOString();
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO content_pages (
+       id, slug, title, description, body, source_note, example, status, created_at, updated_at, published_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, NULL)`,
+  ).run(
+    id,
+    slug,
+    String(row.title),
+    String(row.description),
+    String(row.body),
+    String(row.source_note),
+    Number(row.example),
+    now,
+    now,
+  );
+  return { ok: true, id };
+}
+
 export function readPublicContentPage(db: DatabaseSync, slug: string): ContentPage | null {
   const row = db.prepare(`${ROW_SQL} WHERE slug = ?`).get(slug);
   if (!row) return null;

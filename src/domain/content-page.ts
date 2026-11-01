@@ -32,6 +32,12 @@ export type ContentAssessment = {
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+export function contentSlug(raw: string): string | null {
+  const slug = raw.trim().toLowerCase();
+  if (!SLUG.test(slug) || slug.length < 3 || slug.length > 60) return null;
+  return slug;
+}
+
 export function parseContentDraft(input: {
   readonly slug: string;
   readonly title: string;
@@ -40,12 +46,12 @@ export function parseContentDraft(input: {
   readonly sourceNote: string;
   readonly example: boolean;
 }): { ok: true; value: ContentDraftInput } | { ok: false; reason: "invalid" } {
-  const slug = input.slug.trim().toLowerCase();
+  const slug = contentSlug(input.slug);
   const title = input.title.trim().replace(/\s+/g, " ");
   const description = input.description.trim().replace(/\s+/g, " ");
   const body = input.body.replace(/\r\n/g, "\n").trim();
   const sourceNote = input.sourceNote.trim().replace(/\s+/g, " ");
-  if (!SLUG.test(slug) || slug.length < 3 || slug.length > 60) return { ok: false, reason: "invalid" };
+  if (!slug) return { ok: false, reason: "invalid" };
   if (title.length < 2 || title.length > 120) return { ok: false, reason: "invalid" };
   if (description.length < 2 || description.length > 240) return { ok: false, reason: "invalid" };
   if (body.length > 12000) return { ok: false, reason: "invalid" };
