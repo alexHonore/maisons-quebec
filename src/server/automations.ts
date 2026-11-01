@@ -5,6 +5,7 @@ import { recordAdminAudit } from "./admin-audit";
 import { roleCan } from "./admin-permissions";
 import {
   AUTOMATION_TASK_NAME,
+  automationBoardDocument,
   dryRunAutomation,
   isAutomationAction,
   parseAutomation,
@@ -307,6 +308,18 @@ export function exportAutomationJson(
     page: parsed.definition.page,
   };
   return { ok: true, filename: `automatisation-${document.name}.json`, body: renderAutomationJson(document) };
+}
+
+export function saveAutomationBoard(
+  db: DatabaseSync,
+  input: { actorId: string; actorRole: AdminRole; name: string; trigger: string; action: string; page?: string | null; now: Date },
+): { ok: true; id: string; versionNumber: number } | { ok: false; reason: "forbidden" | AutomationDocumentFailure } {
+  return importAutomationJson(db, {
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    body: automationBoardDocument(input),
+    now: input.now,
+  });
 }
 
 export function importAutomationJson(

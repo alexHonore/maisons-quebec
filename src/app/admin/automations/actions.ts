@@ -2,7 +2,7 @@
 
 import { forbidden, redirect, unauthorized } from "next/navigation";
 import { requestN8nConnection } from "@/domain/automation";
-import { importAutomationJson, previewAutomation, saveAutomation, setAutomationEnabled } from "@/server/automations";
+import { importAutomationJson, previewAutomation, saveAutomationBoard, setAutomationEnabled } from "@/server/automations";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
 import { settingsDatabase } from "@/server/public-site";
@@ -11,7 +11,7 @@ export async function saveAutomationAction(formData: FormData) {
   const live = await readLiveAdmin();
   if (!live.ok) unauthorized();
   if (!roleCan(live.user.role, "automations.manage")) forbidden();
-  const result = saveAutomation(settingsDatabase(process.env), {
+  const result = saveAutomationBoard(settingsDatabase(process.env), {
     actorId: live.user.id,
     actorRole: live.user.role,
     name: String(formData.get("name") ?? ""),

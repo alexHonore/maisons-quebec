@@ -69,6 +69,25 @@ export function automationDocument(definition: ParsedAutomation): AutomationDocu
   };
 }
 
+/** Même document que l'import JSON. Une page n'est ajoutée que si elle est saisie, ou si l'action ouvre un brouillon. */
+export function automationBoardDocument(input: {
+  readonly name: string;
+  readonly trigger: string;
+  readonly action: string;
+  readonly page?: string | null;
+}): string {
+  const action = input.action.trim();
+  const page = (input.page ?? "").trim();
+  const body: { [key: string]: string } = {
+    schema_version: "1.0",
+    name: input.name.trim(),
+    trigger: input.trigger.trim(),
+    action,
+  };
+  if (action === "content.open_draft" || page !== "") body.page = page;
+  return JSON.stringify(body);
+}
+
 export function renderAutomationJson(document: AutomationDocument): string {
   const body: { [key: string]: string } = {
     schema_version: document.schema_version,

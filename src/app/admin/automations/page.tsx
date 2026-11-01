@@ -21,6 +21,75 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+function AutomationBoard({
+  name,
+  trigger,
+  action,
+  page,
+  nameEditable,
+  submitLabel,
+}: {
+  name?: string;
+  trigger: string;
+  action: string;
+  page: string;
+  nameEditable: boolean;
+  submitLabel: string;
+}) {
+  return (
+    <form action={saveAutomationAction}>
+      {nameEditable ? (
+        <label>
+          Nom stable
+          <input name="name" required autoComplete="off" pattern="[a-z][a-z0-9_]{2,40}" />
+        </label>
+      ) : (
+        <input type="hidden" name="name" value={name} />
+      )}
+      <table>
+        <caption>Nœud déclencheur relié au nœud action</caption>
+        <thead>
+          <tr>
+            <th scope="col">Déclencheur</th>
+            <th scope="col">Lien</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <label>
+                Nœud déclencheur
+                <select name="trigger" required defaultValue={trigger}>
+                  {AUTOMATION_TRIGGERS.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+            </td>
+            <td>relié à</td>
+            <td>
+              <label>
+                Nœud action
+                <select name="action" required defaultValue={action}>
+                  {AUTOMATION_ACTIONS.map((item) => (
+                    <option key={item} value={item}>{AUTOMATION_ACTION_LABELS[item]}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Page publiée
+                <input name="page" defaultValue={page} autoComplete="off" />
+              </label>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <button type="submit">{submitLabel}</button>
+    </form>
+  );
+}
+
 const ERRORS: Record<string, string> = {
   invalid_name: "Le nom doit être un identifiant stable, sans script.",
   invalid_trigger: "Ce déclencheur n'est pas émis par le site.",
@@ -52,7 +121,7 @@ export default async function AutomationsPage({
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Automatisations</h1>
       <p>
-        Déclencheurs limités aux événements déjà émis. Actions : remettre une livraison webhook en file, écrire une tâche admin sans donnée personnelle, ou copier le corps d&apos;une page publiée vers un nouveau brouillon. Une action auto_publish est refusée. Le brouillon n&apos;est pas publié.
+        Le tableau relie un nœud déclencheur à un nœud action, parmi les valeurs déjà supportées. Pour ouvrir un brouillon, le nœud action nomme la page. L&apos;enregistrement écrit la même définition que l&apos;import JSON. auto_publish est refusé. Le brouillon n&apos;est pas publié.
       </p>
       <h2>n8n</h2>
       {n8n.message === "à connecter" ? (
@@ -103,69 +172,25 @@ export default async function AutomationsPage({
                 {automation.enabled ? "Désactiver" : "Réactiver"}
               </button>
             </form>
-            <form className="form-grid" action={saveAutomationAction}>
-              <input type="hidden" name="name" value={automation.name} />
-              <label>
-                Déclencheur
-                <select name="trigger" required defaultValue={automation.trigger}>
-                  {AUTOMATION_TRIGGERS.map((trigger) => (
-                    <option key={trigger} value={trigger}>
-                      {trigger}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Action
-                <select name="action" required defaultValue={automation.action}>
-                  {AUTOMATION_ACTIONS.map((action) => (
-                    <option key={action} value={action}>
-                      {AUTOMATION_ACTION_LABELS[action]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Page publiée
-                <input name="page" defaultValue={automation.page ?? ""} autoComplete="off" />
-              </label>
-              <button type="submit">Enregistrer une nouvelle version</button>
-            </form>
+            <AutomationBoard
+              name={automation.name}
+              trigger={automation.trigger}
+              action={automation.action}
+              page={automation.page ?? ""}
+              nameEditable={false}
+              submitLabel="Enregistrer une nouvelle version"
+            />
           </li>
         ))}
       </ul>
       <h2>Nouvelle automatisation</h2>
-      <form className="form-grid" action={saveAutomationAction}>
-        <label>
-          Nom stable
-          <input name="name" required autoComplete="off" pattern="[a-z][a-z0-9_]{2,40}" />
-        </label>
-        <label>
-          Déclencheur émis
-          <select name="trigger" required defaultValue="lead.created">
-            {AUTOMATION_TRIGGERS.map((trigger) => (
-              <option key={trigger} value={trigger}>
-                {trigger}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Action
-          <select name="action" required defaultValue="webhook.requeue">
-            {AUTOMATION_ACTIONS.map((action) => (
-              <option key={action} value={action}>
-                {AUTOMATION_ACTION_LABELS[action]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Page publiée
-          <input name="page" autoComplete="off" />
-        </label>
-        <button type="submit">Enregistrer</button>
-      </form>
+      <AutomationBoard
+        trigger="lead.created"
+        action="webhook.requeue"
+        page=""
+        nameEditable
+        submitLabel="Enregistrer"
+      />
       <h2>Importer un JSON</h2>
       <p>Le fichier accepté contient le nom, le déclencheur et l&apos;action. Pour ouvrir un brouillon, il nomme aussi la page. Une action auto_publish, un secret, une adresse ou un courriel est refusé. L&apos;import ajoute une version.</p>
       <form className="form-grid" action={importAutomationAction}>

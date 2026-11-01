@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ContentArticle } from "../components/content-article";
+import { automationBoardDocument, parseAutomationDocument } from "../domain/automation";
 import { MIN_INDEXABLE_BODY_LENGTH } from "../domain/content-page";
 import { auditPlainText } from "./admin-audit";
 import {
@@ -23,6 +24,7 @@ import {
   previewAutomation,
   runMatchingAutomations,
   saveAutomation,
+  saveAutomationBoard,
   setAutomationEnabled,
 } from "./automations";
 import { readPublicContentPage, saveContentDraft, setContentPublished } from "./content-pages";
@@ -481,6 +483,70 @@ describe("automatisations", () => {
     assert.notEqual(String(draft?.slug), "lire-une-methode");
     assert.equal(readPublicContentPage(db, String(draft?.slug)), null);
     assert.equal(db.prepare("SELECT state FROM automation_runs WHERE action_kind = 'content.open_draft'").get()?.state, "brouillon_ouvert");
+    db.close();
+  });
+
+  it("enregistre depuis le tableau la définition que l'exécuteur lit, sans brouillon à l'essai", () => {
+    const db = freshDb();
+    let body = "";
+    while (body.length < MIN_INDEXABLE_BODY_LENGTH) {
+      body += "Cette page explique une méthode de lecture. Elle ne donne aucun prix et aucune statistique. ";
+    }
+    const saved = saveContentDraft(db, {
+      actorId: "owner-1",
+      actorRole: "owner",
+      slug: "lire-une-methode",
+      title: "Lire une méthode",
+      description: "Cette description présente une méthode de lecture, sans chiffre de marché.",
+      body: `${body.trim()}\n\nCette méthode ne constitue pas un prix de marché. Elle concerne une personne qui veut vendre à Québec. Voir /vendre/calculateur-produit-net.`,
+      sourceNote: "Note de méthode rédigée pour Maisons Québec.",
+      example: false,
+      now,
+    });
+    assert.equal(saved.ok, true);
+    if (!saved.ok) return;
+    assert.equal(setContentPublished(db, { actorId: "owner-1", actorRole: "owner", id: saved.id, published: true, now }).ok, true);
+    const fields = {
+      name: "ouvrir_tableau",
+      trigger: "lead.created",
+      action: "content.open_draft",
+      page: "lire-une-methode",
+    };
+    const document = automationBoardDocument(fields);
+    const parsed = parseAutomationDocument(document);
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(saveAutomationBoard(db, {
+      actorId: "gestionnaire",
+      actorRole: "automation_manager",
+      ...fields,
+      now,
+    }).ok, true);
+    assert.deepEqual(saveAutomationBoard(db, {
+      actorId: "gestionnaire",
+      actorRole: "automation_manager",
+      name: "pub_tableau",
+      trigger: "lead.created",
+      action: "auto_publish",
+      now,
+    }), { ok: false, reason: "invalid_action" });
+    const stored = db.prepare("SELECT trigger_event, action_kind, page_slug FROM automations WHERE name = ?").get(fields.name);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(String(stored?.trigger_event), parsed.document.trigger);
+    assert.equal(String(stored?.action_kind), parsed.document.action);
+    assert.equal(String(stored?.page_slug), parsed.document.page);
+    const pagesBefore = Number(db.prepare("SELECT COUNT(*) AS total FROM content_pages").get()?.total ?? 0);
+    const boardId = String(db.prepare("SELECT id FROM automations WHERE name = ?").get(fields.name)?.id);
+    const preview = previewAutomation(db, { actorRole: "automation_manager", id: boardId });
+    assert.equal(preview.ok, true);
+    if (!preview.ok) return;
+    assert.equal(preview.openedDraft, false);
+    assert.equal(Number(db.prepare("SELECT COUNT(*) AS total FROM content_pages").get()?.total ?? 0), pagesBefore);
+    runMatchingAutomations(db, { trigger: "lead.created", sourceEventId: randomUUID(), occurredAt: now.toISOString() });
+    const draft = db.prepare("SELECT body, status FROM content_pages WHERE slug != ?").get("lire-une-methode");
+    assert.equal(String(draft?.status), "draft");
+    assert.equal(String(draft?.body), readPublicContentPage(db, "lire-une-methode")?.body);
+    assert.equal(readPublicContentPage(db, "lire-une-methode")?.status, "published");
     db.close();
   });
 });
