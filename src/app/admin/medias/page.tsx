@@ -16,7 +16,9 @@ export const metadata: Metadata = {
 };
 
 const ERRORS: Record<string, string> = {
-  invalid: "La fiche exige un titre, une licence, un auteur et une source.",
+  invalid: "La fiche exige un titre, une licence, un auteur et une source. Aucun fichier n'est gardé.",
+  not_image: "Le fichier déposé n'est pas une image reconnue. Rien n'est gardé.",
+  store_failed: "Le fichier n'a pas pu être écrit. Rien n'est gardé.",
   license_required: "Sans licence, l'actif ne peut pas être associé à une page.",
   missing: "Page ou fiche introuvable.",
   forbidden: "Action refusée.",
@@ -43,8 +45,9 @@ export default async function MediaPage({
   return (
     <main className="wrap sheet" id="contenu" style={{ marginBlock: "2rem" }}>
       <h1>Médias</h1>
-      <p>Une fiche exige une licence, un auteur et une source. Sans licence, elle ne peut pas être associée à une page. Aucune image n&apos;est téléchargée ni générée ici.</p>
-      {params.enregistre === "1" ? <p role="status">Fiche enregistrée. Aucun fichier image n&apos;a été ajouté.</p> : null}
+      <p>Une fiche exige une licence, un auteur et une source. Sans ces trois champs, aucun fichier n&apos;est gardé. Un fichier déposé est stocké hors du dépôt. Pexels, Unsplash et la génération ne sont pas appelés.</p>
+      {params.enregistre === "1" ? <p role="status">Fiche enregistrée, sans fichier.</p> : null}
+      {params.enregistre === "fichier" ? <p role="status">Fichier enregistré hors du dépôt, avec la licence, l&apos;auteur et la source.</p> : null}
       {params.associe === "1" ? <p role="status">Fiche associée à la page.</p> : null}
       {params.erreur ? <p role="alert">{ERRORS[params.erreur] ?? "Enregistrement refusé."}</p> : null}
       {params.fournisseur === "a-connecter" ? <p role="status">À connecter. Aucune image n&apos;a été enregistrée.</p> : null}
@@ -71,7 +74,7 @@ export default async function MediaPage({
       <ul className="plain-list">
         {assets.map((asset) => (
           <li key={asset.id}>
-            {asset.title} — licence {asset.license} — {asset.author} — {asset.source}
+            {asset.title} — licence {asset.license} — {asset.author} — {asset.source} — {asset.hasFile ? "fichier déposé" : "aucun fichier"}
           </li>
         ))}
       </ul>
@@ -91,6 +94,10 @@ export default async function MediaPage({
         <label>
           Source
           <input name="source" required autoComplete="off" />
+        </label>
+        <label>
+          Fichier image
+          <input name="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
         </label>
         <button type="submit">Enregistrer la fiche</button>
       </form>

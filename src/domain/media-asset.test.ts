@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { REGULATORY_EMPTY_LABEL } from "./regulatory-identity";
-import { mediaAssociationAllowed, parseMediaAsset, requestImageProvider } from "./media-asset";
+import { detectStoredImage, mediaAssociationAllowed, parseMediaAsset, requestImageProvider } from "./media-asset";
 
 describe("fiche média", () => {
   it("exige une licence, un auteur et une source, et refuse l'association sans licence", () => {
@@ -34,5 +34,12 @@ describe("fiche média", () => {
     const present = requestImageProvider({ apiKey: "cle-presente-non-utilisee", transport });
     assert.deepEqual(present, { ok: false, message: "non branché", recordedImage: false });
     assert.equal(called, 0);
+  });
+
+  it("reconnaît un en-tête d'image et refuse un autre fichier", () => {
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]);
+    assert.equal(detectStoredImage(png)?.contentType, "image/png");
+    const html = Uint8Array.from([0x3c, 0x68, 0x74, 0x6d, 0x6c, 0, 0, 0, 0, 0, 0, 0]);
+    assert.equal(detectStoredImage(html), null);
   });
 });

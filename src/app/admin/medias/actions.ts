@@ -2,7 +2,7 @@
 
 import { forbidden, redirect, unauthorized } from "next/navigation";
 import { requestImageProvider } from "@/domain/media-asset";
-import { attachMediaToPage, saveMediaAsset } from "@/server/media-library";
+import { attachMediaToPage, mediaDirectory, saveMediaAsset } from "@/server/media-library";
 import { readLiveAdmin } from "@/server/current-admin";
 import { roleCan } from "@/server/admin-permissions";
 import { settingsDatabase } from "@/server/public-site";
@@ -11,6 +11,8 @@ export async function saveMediaAssetAction(formData: FormData) {
   const live = await readLiveAdmin();
   if (!live.ok) unauthorized();
   if (!roleCan(live.user.role, "media.manage")) forbidden();
+  const entry = formData.get("file");
+  const file = entry instanceof File && entry.size > 0 ? new Uint8Array(await entry.arrayBuffer()) : null;
   const result = saveMediaAsset(settingsDatabase(process.env), {
     actorId: live.user.id,
     actorRole: live.user.role,
@@ -19,8 +21,11 @@ export async function saveMediaAssetAction(formData: FormData) {
     author: String(formData.get("author") ?? ""),
     source: String(formData.get("source") ?? ""),
     now: new Date(),
+    file,
+    directory: mediaDirectory(process.env),
   });
-  redirect(result.ok ? "/admin/medias?enregistre=1" : `/admin/medias?erreur=${result.reason}`);
+  if (!result.ok) redirect(`/admin/medias?erreur=${result.reason}`);
+  redirect(result.storedFile ? "/admin/medias?enregistre=fichier" : "/admin/medias?enregistre=1");
 }
 
 export async function attachMediaAction(formData: FormData) {

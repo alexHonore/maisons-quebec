@@ -3,6 +3,7 @@ import { indexReasonLabel, type ContentAssessment } from "@/domain/content-page"
 export function ContentArticle({
   page,
   preview,
+  media,
 }: {
   page: {
     readonly title: string;
@@ -13,6 +14,13 @@ export function ContentArticle({
     readonly assessment: ContentAssessment;
   };
   preview: boolean;
+  media?: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly author: string;
+    readonly license: string;
+    readonly source: string;
+  }[];
 }) {
   return (
     <article className="wrap pillar">
@@ -33,6 +41,14 @@ export function ContentArticle({
         <p key={paragraph}>{paragraph}</p>
       ))}
       <p>Source déclarée : {page.sourceNote === "" ? "aucune" : page.sourceNote}</p>
+      {media?.map((item) => (
+        <figure key={item.id}>
+          {/* Fichier local servi par /medias. Pas d'optimiseur qui irait chercher une image. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/medias/${item.id}`} alt={item.title} />
+          <figcaption>{item.author} — {item.license} — {item.source}</figcaption>
+        </figure>
+      ))}
     </article>
   );
 }

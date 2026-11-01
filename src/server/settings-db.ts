@@ -379,6 +379,11 @@ export const MIGRATIONS = [
     `,
     down: "DROP TABLE IF EXISTS engaged_seconds;",
   },
+  {
+    version: "018_media_files",
+    up: "ALTER TABLE media_assets ADD COLUMN file_ext TEXT;",
+    down: "ALTER TABLE media_assets DROP COLUMN file_ext;",
+  },
 ] as const;
 
 export function settingsFilePath(env: { readonly [key: string]: string | undefined }): string {
